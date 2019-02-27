@@ -177,9 +177,33 @@ async function run(tickers, marketOpen, marketClose) {
 
   console.log(`Tracking ${symbols.length} symbols`);
   var minute_history = await get1000mHistoryData(symbols);
-  //console.log(minute_history);
+
   var portfolio_value = (await alpaca.getAccount()).portfolio_value;
   console.log(portfolio_value);
+
+  var open_orders = {};
+  var positions = {};
+  
+  var existing_orders = await alpaca.getOrders({limit:500});
+  for(var i =0; i < existing_orders.length; i++){
+    await alpaca.cancelOrder(existing_orders[i].id);
+  }
+  var stop_prices = {};
+  var latest_cost_basis = {};
+
+  var existing_positions = await alpaca.getPositions();
+  for(var i = 0; i < existing_positions.length; i++){
+    if(symbols.includes(existing_positions[i].symbol)){
+      positions[existing_positions[i].symbol] = existing_positions[i].symbol.qty;
+      //recalculate cost basis
+      latest_cost_basis[existing_positions[i].symbol] = existing_positions[i].cost_basis;
+      stop_prices[existing_positions[i].symbol] = parseFloat(existing_positions[i].cost_basis * default_stop);
+    }
+  }
+
+  var target_prices = {};
+  var partial_fills = {};
+
 }
 
 (async function() {

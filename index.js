@@ -2,6 +2,7 @@ const Alpaca = require("@alpacahq/alpaca-trade-api");
 const key = "PK0P4FZK0S4LMVD36VN7";
 const secret = "I0NtyoxIRrGeVFptPWQByDAWfLOrClfpeQ3GX/HV";
 const alpaca = new Alpaca({keyId: key, secretKey: secret, paper: true});
+const MACD = require('technicalindicators').MACD;
 
 async function getAllTickers() {
     let snapshotUrl = `https://api.polygon.io/v2/snapshot/locale/us/markets/stocks/tickers?apiKey=${key}`;
@@ -76,10 +77,9 @@ async function get1000mHistoryData(symbols) {
     for (var i = 0; i < symbols.length; i++) {
         var symbol = symbols[i];
         toReturn[symbol] = await alpaca.getHistoricAggregates("minute", symbol, {limit: 1000});
-        console.log(`${i}/${symbols.length}`);
+        console.log(toReturn[symbol].ticks[0]);
     }
     console.log("Got historical data");
-    console.log(toReturn['CYRX']);
     return toReturn;
 }
 
@@ -142,6 +142,8 @@ function tradeUpdate(subject, data) {
 function secondBar(subject, data) {
     //console.log("Second Bar"); console.log(data); example second bar
     var symbol = data.sym;
+    var ts = data.s;
+    //loc function in python is just finding the minute timestamp
     //look at https://www.npmjs.com/package/technicalindicators for MACD calculations
     /*{ sym: 'SOLO',
   v: 100,
@@ -208,6 +210,7 @@ async function run(tickers, marketOpen, marketClose) {
 
     console.log(`Tracking ${symbols.length} symbols`);
     minute_history = await get1000mHistoryData(symbols);
+    console.log(minute_history);
 
     var portfolio_value = (await alpaca.getAccount()).portfolio_value;
     console.log(portfolio_value);
@@ -234,11 +237,11 @@ async function run(tickers, marketOpen, marketClose) {
     var marketClose = getMarketClose(calendarArr);
     var marketOpen = getMarketOpen(calendarArr);
     var currentDateTime = new Date();
-    while (currentDateTime.getTime() < marketOpen.getTime() + 60 * 1000 * 15) {
-        await snooze(1000);
-        console.log("Waiting for Market Open At " + marketOpen + " in " + ((currentDateTime.getTime() - marketOpen.getTime()) / 1000) + " seconds");
-        currentDateTime = new Date();
-    }
+    // while (currentDateTime.getTime() < marketOpen.getTime() + 60 * 1000 * 15) {
+    //     await snooze(1000);
+    //     console.log("Waiting for Market Open At " + marketOpen + " in " + ((currentDateTime.getTime() - marketOpen.getTime()) / 1000) + " seconds");
+    //     currentDateTime = new Date();
+    // }
     var tickers = await getTickers();
     await run(tickers, marketOpen, marketClose);
 })();

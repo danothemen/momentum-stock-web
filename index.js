@@ -74,6 +74,7 @@ async function get1000mHistoryData(symbols) {
     for (var i = 0; i < symbols.length; i++) {
         var symbol = symbols[i];
         toReturn[symbol] = await alpaca.getHistoricAggregates("minute", symbol, {limit: 1000});
+        console.log(toReturn[symbol].ticks[0]);
     }
     return toReturn;
 }
@@ -129,14 +130,59 @@ function tradeUpdate(subject, data) {
         }
     }
 }
+function getIndexForTimeStamp(symbol,ts){
+    if(minute_history[symbol]){
+        //console.log(minute_history[symbol].ticks);
+        for(var i = 0; i < minute_history[symbol].ticks.length; i++){
+            if(minute_history[symbol].ticks.t == ts){
+                return i;
+            }
+        }
+    }
+    return -1;
+}
 function secondBar(subject, data) {
     // example second bar
     var symbol = data.sym;
-    var ts = data.s;
-    console.log(symbol);
-    console.log(subject);
-    console.log(new Date(data.s));
-
+    var ts = new Date(data.s);
+    //console.log(symbol);
+    //console.log(subject);
+    console.log(data);
+    var minute = new Date(ts.getFullYear(),ts.getMonth(),ts.getDate(),ts.getHours(),ts.getMinutes,0,0);
+    ts = minute.getTime();
+    var indexForTs = getIndexForTimeStamp(symbol,ts);
+    if(indexForTs > -1){
+        minute_history[symbol].ticks[indexForTs] = {
+            o: data.o,
+            h: data.h > minute_history[symbol].ticks[indexForTs].h ? data.h : minute_history[symbol].ticks[indexForTs].h,
+            l: data.l < minute_history[symbol].ticks[indexForTs].l ? data.l : minute_history[symbol].ticks[indexForTs].l,
+            c: data.c,
+            v: data.v + minute_history[symbol].ticks[indexForTs].v,
+            t: ts,
+            d: ts
+        };
+    }
+    else{
+        minute_history[symbol].ticks.push({
+            o: data.o,
+            h: data.h,
+            l: data.l,
+            c: data.c,
+            v: data.v,
+            t: ts,
+            d: ts
+        });
+    }
+    var existing_order = open_orders[symbol];
+    if(existing_order){
+        //TODO: double check that this object definition is accurate
+        var submitted_at = existing_order.submitted_at;
+        var order_lifetime = ts-submitted_at;
+        if(order_lifetime/1000/60 > 1){
+            alpaca.cancelOrder(existing_order.id);
+        }
+        return;
+    }
     //loc function in python is just finding the minute timestamp
     //look at https://www.npmjs.com/package/technicalindicators for MACD calculations
     /*{ sym: 'SOLO',
@@ -153,7 +199,7 @@ function secondBar(subject, data) {
   e: 1551215796000 } */
 }
 function minuteBar(subject, data) {
-    console.log(data);
+    //console.log(data);
     /**
   //example minute bar
   { sym: 'SOLO',
@@ -177,7 +223,7 @@ async function run(tickers, marketOpen, marketClose) {
     websocket.onStockAggSec(secondBar);
     websocket.onStockAggMin(minuteBar);
     websocket.onOrderUpdate(tradeUpdate);
-    var toSubscribe = ["trade_updates"];
+    var toSubscribe = ["trade_updates","T.AAPL","A.AAPL","Q.AAPL","AM.AAPL"];
 
     var symbols = [];
 
@@ -196,14 +242,14 @@ async function run(tickers, marketOpen, marketClose) {
     websocket.onConnect(() => {
         console.log("Connected WebSocket");
         websocket.subscribe(toSubscribe);
-        console.log(websocket.subscriptionState);
+        //console.log(websocket.subscriptionState);
     });
     websocket.onDisconnect(()=>{console.log("Web Socket Disconnected");});
     websocket.onError(()=>{console.log("Error");});
-    websocket.connect();
+    
 
     minute_history = await get1000mHistoryData(symbols);
-
+    console.log(minute_history['SRCI']);
     var portfolio_value = (await alpaca.getAccount()).portfolio_value;
 
     var existing_orders = await alpaca.getOrders({limit: 500});
@@ -222,17 +268,18 @@ async function run(tickers, marketOpen, marketClose) {
             stop_prices[existing_positions[i].symbol] = parseFloat(existing_positions[i].cost_basis * default_stop);
         }
     }
+    websocket.connect();
 }
 (async function () {
     var calendarArr = await alpaca.getCalendar({start: new Date(), end: new Date()});
     var marketClose = getMarketClose(calendarArr);
     var marketOpen = getMarketOpen(calendarArr);
     var currentDateTime = new Date();
-    while (currentDateTime.getTime() < marketOpen.getTime() + 60 * 1000 * 15) {
-        await snooze(1000);
-        console.log("Waiting for Market Open At " + marketOpen + " in " + ((currentDateTime.getTime() - marketOpen.getTime()) / 1000) + " seconds");
-        currentDateTime = new Date();
-    }
+    // while (currentDateTime.getTime() < marketOpen.getTime() + 60 * 1000 * 15) {
+    //     await snooze(1000);
+    //     console.log("Waiting for Market Open At " + marketOpen + " in " + ((currentDateTime.getTime() - marketOpen.getTime()) / 1000) + " seconds");
+    //     currentDateTime = new Date();
+    // }
     var tickers = await getTickers();
     await run(tickers, marketOpen, marketClose);
 })();

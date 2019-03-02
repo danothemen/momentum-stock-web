@@ -267,7 +267,7 @@ function secondBar(subject, data) {
         if(hist[hist.length-1].MACD < 0 || (hist[hist.length-1].MACD - hist[hist.length-2].MACD) < 0){
             return;
         }
-
+        //TODO: Python is below this point
         // Stock has passed all checks; figure out how much to buy
         var stop_price = find_stop(data.close, minute_history[symbol], ts);
         stop_prices[symbol] = stop_price

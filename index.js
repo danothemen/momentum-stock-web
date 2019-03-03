@@ -329,6 +329,39 @@ function secondBar(subject, data) {
 }
 function minuteBar(subject, data) {
   //console.log(data);
+  var ts = new Date(data.s);
+  //console.log(symbol);
+  //console.log(subject);
+  console.log(data);
+  var minute = new Date(
+    ts.getFullYear(),
+    ts.getMonth(),
+    ts.getDate(),
+    ts.getHours(),
+    ts.getMinutes,
+    0,
+    0
+  );
+  ts = minute.getTime();
+
+  var indexForTs = getIndexForTimeStamp(data.sym, ts);
+  
+  var minHistoryTick = {
+    o: data.o,
+    h: data.h,
+    l: data.l,
+    c: data.c,
+    v: data.v,
+    t: ts,
+    d: ts
+  };
+  if(indexForTs > -1){
+    minute_history[data.sym].ticks[indexForTs] = minHistoryTick;
+  }
+  else{
+    minute_history[data.sym].ticks.push(minHistoryTick);
+  }
+  volume_today[data.sym] = data.v;
   /**
   //example minute bar
   { sym: 'SOLO',

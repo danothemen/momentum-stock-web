@@ -30,10 +30,6 @@ async function getAllTickers() {
   return toReturn;
 }
 
-function find_stop(current_value, minute_historyinf,now){
-
-}
-
 // We only consider stocks with per-share prices inside this range
 const min_share_price = 2.0;
 const max_share_price = 13.0;
@@ -47,10 +43,15 @@ default_stop = 0.95;
 // How much of our portfolio to allocate to any one position
 risk = 0.25;
 
-var pctForBuy = .04;
+var pctForBuy = 0.04;
 
 function print(obj) {
   console.log(obj);
+}
+
+function find_stop(current_value, minute_historyinf, now) {
+  //TODO: Need more sophisticated stop loss algorithm
+  return current_value * default_stop;
 }
 
 const snooze = ms => new Promise(resolve => setTimeout(resolve, ms));
@@ -156,16 +157,16 @@ function getIndexForTimeStamp(symbol, ts) {
   }
   return -1;
 }
-function getHighBetween(lbound,ubound,symbol){
-    var toSearch = minute_history[symbol].ticks.filter(t=>{
-        return t.t >= lbound && t.t <= ubound;
-    });
-    var high = 0;
-    for(var i = 0; i < toSearch.length; i++){
-        if(toSearch.h > high){
-            high = toSearch.h;
-        }
+function getHighBetween(lbound, ubound, symbol) {
+  var toSearch = minute_history[symbol].ticks.filter(t => {
+    return t.t >= lbound && t.t <= ubound;
+  });
+  var high = 0;
+  for (var i = 0; i < toSearch.length; i++) {
+    if (toSearch.h > high) {
+      high = toSearch.h;
     }
+  }
 }
 function secondBar(subject, data) {
   // example second bar
@@ -222,85 +223,97 @@ function secondBar(subject, data) {
     }
     return;
   }
-  var since_market_open = ts - marketOpen.getTime();;
+  var since_market_open = ts - marketOpen.getTime();
   var until_market_close = marketClose.getTime() - ts;
-  if (since_market_open / 1000 / 60 > 15 && since_market_open / 1000 / 60 < 60) {
+  if (
+    since_market_open / 1000 / 60 > 15 &&
+    since_market_open / 1000 / 60 < 60
+  ) {
     // Check for buy signals
 
     // See if we've already bought in first
     var position = positions[symbol];
-    if(position > 0){
-        return;
+    if (position > 0) {
+      return;
     }
 
     // See how high the price went during the first 15 minutes
     var lbound = marketOpen.getTime();
-    var ubound = lbound + 1000*60*15;
+    var ubound = lbound + 1000 * 60 * 15;
     var high_15m = 0;
-    if(minute_history[symbol]){
-        high_15m = getHighBetween(lbound,ubound,symbol);
-    }
-    else{
-        // Because we're aggregating on the fly, sometimes the datetime
-        // index can get messy until it's healed by the minute bars
-        return;
+    if (minute_history[symbol]) {
+      high_15m = getHighBetween(lbound, ubound, symbol);
+    } else {
+      // Because we're aggregating on the fly, sometimes the datetime
+      // index can get messy until it's healed by the minute bars
+      return;
     }
 
     // Get the change since yesterday's market close
-    daily_pct_change = ((data.close - prev_closes[symbol]) / prev_closes[symbol]);
+    daily_pct_change = (data.close - prev_closes[symbol]) / prev_closes[symbol];
     if (
-        daily_pct_change > pctForBuy &&
-        data.close > high_15m &&
-        volume_today[symbol] > 30000
-    ){
-        // check for a positive, increasing MACD
-        var closingPrices = minute_history[symbol].ticks.map(o=>o.c);
-        var hist = macd(closingPrices,26,12,9);
-        if (
-            hist[hist.length-1].MACD < 0 ||
-            !(hist[hist.length-3].MACD < hist[hist.length-2].MACD < hist[hist.length-1].MACD)
-        ){
-            return
-        }
-        hist = macd(closingPrices,60,40,9); //TODO: Ask about on slack
-
-        if(hist[hist.length-1].MACD < 0 || (hist[hist.length-1].MACD - hist[hist.length-2].MACD) < 0){
-            return;
-        }
-        //TODO: Python is below this point
-        // Stock has passed all checks; figure out how much to buy
-        var stop_price = find_stop(data.close, minute_history[symbol], ts);
-        stop_prices[symbol] = stop_price
-        target_prices[symbol] = data.close + (
-            (data.close - stop_price) * 3
+      daily_pct_change > pctForBuy &&
+      data.close > high_15m &&
+      volume_today[symbol] > 30000
+    ) {
+      // check for a positive, increasing MACD
+      var closingPrices = minute_history[symbol].ticks.map(o => o.c);
+      var hist = macd(closingPrices, 26, 12, 9);
+      if (
+        hist[hist.length - 1].MACD < 0 ||
+        !(
+          hist[hist.length - 3].MACD <
+          hist[hist.length - 2].MACD <
+          hist[hist.length - 1].MACD
         )
-        shares_to_buy = portfolio_value * risk // (
-            data.close - stop_price
-        )
-        if shares_to_buy == 0:
-            shares_to_buy = 1
-        shares_to_buy -= positions.get(symbol, 0)
-        if shares_to_buy <= 0:
-            return
+      ) {
+        return;
+      }
+      hist = macd(closingPrices, 60, 40, 9); //TODO: Ask about on slack
 
-        print('Submitting buy for {} shares of {} at {}'.format(
-            shares_to_buy, symbol, data.close
-        ))
-        try:
-            o = api.submit_order(
-                symbol=symbol, qty=str(shares_to_buy), side='buy',
-                type='limit', time_in_force='day',
-                limit_price=str(data.close)
-            )
-            open_orders[symbol] = o
-            latest_cost_basis[symbol] = data.close
-        except Exception as e:
-            print(e)
-        return
-            }
+      if (
+        hist[hist.length - 1].MACD < 0 ||
+        hist[hist.length - 1].MACD - hist[hist.length - 2].MACD < 0
+      ) {
+        return;
+      }
+      //TODO: Python is below this point
+      // Stock has passed all checks; figure out how much to buy
+      var stop_price = find_stop(data.c, minute_history[symbol], ts);
+      stop_prices[symbol] = stop_price;
+      target_prices[symbol] = data.c + (data.close - stop_price) * 3;
+      var shares_to_buy = Math.floor(
+        (portfolio_value * risk) / (data.c - stop_price)
+      );
+      if (shares_to_buy == 0) {
+        shares_to_buy = 1;
+      }
+      shares_to_buy -= positions[symbol];
+      if (shares_to_buy <= 0) {
+        return;
+      }
+
+      console.log(
+        `Submitting buy for ${shares_to_buy} shares of ${symbol} at ${data.c}`
+      );
+      try {
+        o = api.submit_order(
+          (symbol = symbol),
+          (qty = str(shares_to_buy)),
+          (side = "buy"),
+          (type = "limit"),
+          (time_in_force = "day"),
+          (limit_price = str(data.close))
+        );
+        open_orders[symbol] = o;
+        latest_cost_basis[symbol] = data.close;
+      } catch (e) {
+        console.log(e);
+      }
+    }
   }
   //loc function in python is just finding the minute timestamp
-  //look at https://www.npmjs.com/package/technicalindicators for MACD calculations
+  //look at https://www.npmjs.com/package/macd for MACD calculations
   /*{ sym: 'SOLO',
   v: 100,
   av: 11237696,

@@ -41,13 +41,9 @@ min_last_dv = 500000;
 default_stop = 0.95;
 
 // How much of our portfolio to allocate to any one position
-risk = 0.25;
+risk = 0.05;
 
 var pctForBuy = 0.04;
-
-function print(obj) {
-  console.log(obj);
-}
 
 function find_stop(current_value, minute_historyinf, now) {
   //TODO: Need more sophisticated stop loss algorithm
@@ -114,6 +110,11 @@ var partial_fills = {};
 var minute_history = {};
 var marketClose;
 var marketOpen;
+var symbols = [];
+var portfolio_value;
+
+var stop_prices = {};
+var latest_cost_basis = {};
 
 function tradeUpdate(subject, data) {
   var symbol = data.order["symbol"];
@@ -172,9 +173,6 @@ function secondBar(subject, data) {
   // example second bar
   var symbol = data.sym;
   var ts = new Date(data.s);
-  //console.log(symbol);
-  //console.log(subject);
-  console.log(data);
   var minute = new Date(
     ts.getFullYear(),
     ts.getMonth(),
@@ -277,11 +275,10 @@ function secondBar(subject, data) {
       ) {
         return;
       }
-      //TODO: Python is below this point
       // Stock has passed all checks; figure out how much to buy
       var stop_price = find_stop(data.c, minute_history[symbol], ts);
       stop_prices[symbol] = stop_price;
-      target_prices[symbol] = data.c + (data.close - stop_price) * 3;
+      target_prices[symbol] = data.c + (data.c - stop_price) * 3;
       var shares_to_buy = Math.floor(
         (portfolio_value * risk) / (data.c - stop_price)
       );
@@ -297,14 +294,14 @@ function secondBar(subject, data) {
         `Submitting buy for ${shares_to_buy} shares of ${symbol} at ${data.c}`
       );
       try {
-        o = api.submit_order(
-          (symbol = symbol),
-          (qty = str(shares_to_buy)),
-          (side = "buy"),
-          (type = "limit"),
-          (time_in_force = "day"),
-          (limit_price = str(data.close))
-        );
+        var o = await alpaca.createOrder({
+          symbol:symbol,
+          qty:position,
+          side:'buy',
+          type:'limit',
+          time_in_force:'day',
+          limit_price:data.c
+        });
         open_orders[symbol] = o;
         latest_cost_basis[symbol] = data.close;
       } catch (e) {
@@ -312,6 +309,76 @@ function secondBar(subject, data) {
       }
     }
   }
+  //Begin Sell Logic
+  if(since_market_open /1000 / 60 >= 24 || until_market_close /1000 / 60 > 15){
+    // Check for liquidation signals
+    
+    // We can't liquidate if there's no position
+    position = positions[symbol]
+    if(!position){
+        return;
+    }
+
+    // Sell for a loss if it's fallen below our stop price
+    // Sell for a loss if it's below our cost basis and MACD < 0
+    // Sell for a profit if it's above our target price
+    var closingPrices = minute_history[symbol].ticks.map(o => o.c);
+    var hist = macd(closingPrices, 26, 12, 9);
+    if (
+        data.c <= stop_prices[symbol] ||
+        (data.c >= target_prices[symbol] && hist[hist.length-1].MACD <= 0) ||
+        (data.c <= latest_cost_basis[symbol] && hist[hist.length-1].MACD <= 0)
+    ){
+        console.log(`Submitting sell for ${position} shares of ${symbol} at ${data.c}`);
+        try{
+          //Start here!!
+          var o = await alpaca.createOrder({
+            symbol:symbol,
+            qty:position,
+            side:'sell',
+            type:'limit',
+            time_in_force:'day',
+            limit_price:data.c
+          });
+            open_orders[symbol] = o;
+            latest_cost_basis[symbol] = data.c;
+        }
+        catch(e){
+          console.log(e);
+        }
+  }
+    return;}
+else if (until_market_close / 1000 / 60 <= 15){
+    var symbol = data.sym;
+    var position;
+    //S Liquidate remaining positions on watched symbols at market
+    try{
+        position = await alpaca.getPosition(symbol)
+    }
+    catch(e){
+        // Exception here indicates that we have no position
+        return;
+    }
+    console.log(`Trading over, liquidating remaining position in ${symbol}`);
+    var o = await alpaca.createOrder({
+      symbol:symbol,
+      qty:position.qty,
+      side:'sell',
+      type:'market',
+      time_in_force:'day',
+      limit_price:data.c
+    });
+    //TODO: find definition of symbols!
+    symbols.remove(symbol)
+    if(symbols.length <= 0){
+        conn.close();
+    }
+    websocket.unsubscribe([
+      `A.${symbol}`,
+      `AM.${symbol}`
+  ]);
+  }
+
   //loc function in python is just finding the minute timestamp
   //look at https://www.npmjs.com/package/macd for MACD calculations
   /*{ sym: 'SOLO',
@@ -379,15 +446,13 @@ function minuteBar(subject, data) {
   e: 1551215940000 }
    */
 }
-async function run(tickers, marketOpen, marketClose) {
+async function run(tickers) {
   let websocket = alpaca.websocket;
 
   websocket.onStockAggSec(secondBar);
   websocket.onStockAggMin(minuteBar);
   websocket.onOrderUpdate(tradeUpdate);
   var toSubscribe = ["trade_updates"];
-
-  var symbols = [];
 
   for (var i = 0; i < tickers.length; i++) {
     var toAddA = "A." + tickers[i].ticker;
@@ -415,14 +480,12 @@ async function run(tickers, marketOpen, marketClose) {
 
   minute_history = await get1000mHistoryData(symbols);
   console.log(minute_history["SRCI"]);
-  var portfolio_value = (await alpaca.getAccount()).portfolio_value;
+  portfolio_value = (await alpaca.getAccount()).portfolio_value;
 
   var existing_orders = await alpaca.getOrders({ limit: 500 });
   for (var i = 0; i < existing_orders.length; i++) {
     await alpaca.cancelOrder(existing_orders[i].id);
   }
-  var stop_prices = {};
-  var latest_cost_basis = {};
 
   var existing_positions = await alpaca.getPositions();
   for (var i = 0; i < existing_positions.length; i++) {
@@ -444,14 +507,14 @@ async function run(tickers, marketOpen, marketClose) {
     start: new Date(),
     end: new Date()
   });
-  var marketClose = getMarketClose(calendarArr);
-  var marketOpen = getMarketOpen(calendarArr);
+  marketClose = getMarketClose(calendarArr);
+  marketOpen = getMarketOpen(calendarArr);
   var currentDateTime = new Date();
-  // while (currentDateTime.getTime() < marketOpen.getTime() + 60 * 1000 * 15) {
-  //     await snooze(1000);
-  //     console.log("Waiting for Market Open At " + marketOpen + " in " + ((currentDateTime.getTime() - marketOpen.getTime()) / 1000) + " seconds");
-  //     currentDateTime = new Date();
-  // }
+  while (currentDateTime.getTime() < marketOpen.getTime() + 60 * 1000 * 15) {
+      await snooze(1000);
+      console.log("Waiting for Market Open At " + marketOpen + " in " + ((currentDateTime.getTime() - marketOpen.getTime()) / 1000) + " seconds");
+      currentDateTime = new Date();
+  }
   var tickers = await getTickers();
   await run(tickers, marketOpen, marketClose);
 })();

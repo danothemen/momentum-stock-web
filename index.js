@@ -1,6 +1,6 @@
 const Alpaca = require("@alpacahq/alpaca-trade-api");
-const key = "PK0P4FZK0S4LMVD36VN7";
-const secret = "I0NtyoxIRrGeVFptPWQByDAWfLOrClfpeQ3GX/HV";
+const key = "PKEEM7SJ5LQ1429CGPAK";
+const secret = "7prDOquO7qIwnu/40CKIfDSRoYniMjQTYgSb9eZC";
 const alpaca = new Alpaca({ keyId: key, secretKey: secret, paper: true });
 const macd = require("macd");
 
@@ -79,7 +79,7 @@ async function get1000mHistoryData(symbols) {
     toReturn[symbol] = await alpaca.getHistoricAggregates("minute", symbol, {
       limit: 1000
     });
-    console.log(toReturn[symbol].ticks[0]);
+    //console.log(toReturn[symbol].ticks[0]);
   }
   return toReturn;
 }
@@ -116,7 +116,8 @@ var portfolio_value;
 var stop_prices = {};
 var latest_cost_basis = {};
 
-function tradeUpdate(subject, data) {
+function tradeUpdate(data) {
+  console.log(data);
   var symbol = data.order["symbol"];
   var last_order = open_orders[symbol];
   if (last_order) {
@@ -168,8 +169,11 @@ function getHighBetween(lbound, ubound, symbol) {
       high = toSearch.h;
     }
   }
+  return high;
 }
-function secondBar(subject, data) {
+var secondUpdatesReceived = 0;
+async function secondBar(subject, data) {
+  secondUpdatesReceived++;
   // example second bar
   var symbol = data.sym;
   var ts = new Date(data.s);
@@ -178,7 +182,7 @@ function secondBar(subject, data) {
     ts.getMonth(),
     ts.getDate(),
     ts.getHours(),
-    ts.getMinutes,
+    ts.getMinutes(),
     0,
     0
   );
@@ -213,25 +217,30 @@ function secondBar(subject, data) {
   }
   var existing_order = open_orders[symbol];
   if (existing_order) {
+    console.log("Returning because of existing order");
     //TODO: double check that this object definition is accurate
-    var submitted_at = existing_order.submitted_at;
+    var submitted_at = new Date(existing_order.updated_at).getTime();
     var order_lifetime = ts - submitted_at;
+    console.log(existing_order);
     if (order_lifetime / 1000 / 60 > 1) {
-      alpaca.cancelOrder(existing_order.id);
+      await alpaca.cancelOrder(existing_order.id);
+
     }
     return;
   }
   var since_market_open = ts - marketOpen.getTime();
   var until_market_close = marketClose.getTime() - ts;
+  console.log(ts);
   if (
     since_market_open / 1000 / 60 > 15 &&
-    since_market_open / 1000 / 60 < 60
+    since_market_open / 1000 / 60 < 60 /*remove after debugging*/|| true
   ) {
     // Check for buy signals
-
+    console.log("It's the right time for buying");
     // See if we've already bought in first
     var position = positions[symbol];
     if (position > 0) {
+      console.log("Returning because of existing position");
       return;
     }
 
@@ -242,27 +251,29 @@ function secondBar(subject, data) {
     if (minute_history[symbol]) {
       high_15m = getHighBetween(lbound, ubound, symbol);
     } else {
+      console.log("Returning because of invalid minute history");
       // Because we're aggregating on the fly, sometimes the datetime
       // index can get messy until it's healed by the minute bars
       return;
     }
 
     // Get the change since yesterday's market close
-    daily_pct_change = (data.close - prev_closes[symbol]) / prev_closes[symbol];
+    daily_pct_change = (data.c - prev_closes[symbol]) / prev_closes[symbol];
+    //console.log(high_15m);
     if (
       daily_pct_change > pctForBuy &&
-      data.close > high_15m &&
+      data.c > high_15m &&
       volume_today[symbol] > 30000
     ) {
       // check for a positive, increasing MACD
       var closingPrices = minute_history[symbol].ticks.map(o => o.c);
       var hist = macd(closingPrices, 26, 12, 9);
       if (
-        hist[hist.length - 1].MACD < 0 ||
+        hist.MACD[hist.MACD.length - 1] < 0 ||
         !(
-          hist[hist.length - 3].MACD <
-          hist[hist.length - 2].MACD <
-          hist[hist.length - 1].MACD
+          hist.MACD[hist.MACD.length - 3] <
+          hist.MACD[hist.MACD.length - 2] <
+          hist.MACD[hist.MACD.length - 1]
         )
       ) {
         return;
@@ -270,22 +281,27 @@ function secondBar(subject, data) {
       hist = macd(closingPrices, 60, 40, 9); //TODO: Ask about on slack
 
       if (
-        hist[hist.length - 1].MACD < 0 ||
-        hist[hist.length - 1].MACD - hist[hist.length - 2].MACD < 0
+        hist.MACD[hist.MACD.length - 1] < 0 ||
+        hist.MACD[hist.MACD.length - 1] - hist.MACD[hist.MACD.length - 2] < 0
       ) {
         return;
       }
       // Stock has passed all checks; figure out how much to buy
       var stop_price = find_stop(data.c, minute_history[symbol], ts);
+      console.log(stop_price);
       stop_prices[symbol] = stop_price;
       target_prices[symbol] = data.c + (data.c - stop_price) * 3;
+      console.log(portfolio_value);
+      console.log(risk);
       var shares_to_buy = Math.floor(
-        (portfolio_value * risk) / (data.c - stop_price)
+        (portfolio_value * risk) / data.c//(data.c - stop_price)
       );
       if (shares_to_buy == 0) {
         shares_to_buy = 1;
       }
-      shares_to_buy -= positions[symbol];
+      if(positions[symbol]){
+        shares_to_buy -= positions[symbol];
+      }
       if (shares_to_buy <= 0) {
         return;
       }
@@ -293,17 +309,18 @@ function secondBar(subject, data) {
       console.log(
         `Submitting buy for ${shares_to_buy} shares of ${symbol} at ${data.c}`
       );
+      
       try {
         var o = await alpaca.createOrder({
           symbol:symbol,
-          qty:position,
+          qty:shares_to_buy,
           side:'buy',
           type:'limit',
           time_in_force:'day',
           limit_price:data.c
         });
         open_orders[symbol] = o;
-        latest_cost_basis[symbol] = data.close;
+        latest_cost_basis[symbol] = data.c;
       } catch (e) {
         console.log(e);
       }
@@ -395,11 +412,9 @@ else if (until_market_close / 1000 / 60 <= 15){
   e: 1551215796000 } */
 }
 function minuteBar(subject, data) {
-  //console.log(data);
   var ts = new Date(data.s);
   //console.log(symbol);
   //console.log(subject);
-  console.log(data);
   var minute = new Date(
     ts.getFullYear(),
     ts.getMonth(),
@@ -465,11 +480,12 @@ async function run(tickers) {
   }
   websocket.onStateChange(newState => {
     console.log(`State changed to ${newState}`);
+    
   });
   websocket.onConnect(() => {
     console.log("Connected WebSocket");
     websocket.subscribe(toSubscribe);
-    //console.log(websocket.subscriptionState);
+    console.log(websocket.subscriptionState);
   });
   websocket.onDisconnect(() => {
     console.log("Web Socket Disconnected");
@@ -479,7 +495,6 @@ async function run(tickers) {
   });
 
   minute_history = await get1000mHistoryData(symbols);
-  console.log(minute_history["SRCI"]);
   portfolio_value = (await alpaca.getAccount()).portfolio_value;
 
   var existing_orders = await alpaca.getOrders({ limit: 500 });
@@ -516,5 +531,7 @@ async function run(tickers) {
       currentDateTime = new Date();
   }
   var tickers = await getTickers();
+  console.log(tickers);
+  setInterval(()=>{console.log(`Received ${secondUpdatesReceived} second updates so far`)},1000);
   await run(tickers, marketOpen, marketClose);
 })();

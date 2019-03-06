@@ -233,7 +233,7 @@ async function secondBar(subject, data) {
   console.log(ts);
   if (
     since_market_open / 1000 / 60 > 15 &&
-    since_market_open / 1000 / 60 < 60 /*remove after debugging*/|| true
+    since_market_open / 1000 / 60 < 60 /*remove || true after debugging || true*/
   ) {
     // Check for buy signals
     console.log("It's the right time for buying");

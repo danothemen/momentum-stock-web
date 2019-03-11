@@ -33,7 +33,7 @@ async function getAllTickers() {
 // We only consider stocks with per-share prices inside this range
 const min_share_price = 2.0;
 const max_share_price = 13.0;
-
+const after_open_trade_min = 120;
 // Minimum previous-day dollar volume for a stock we might consider
 min_last_dv = 500000;
 
@@ -117,7 +117,8 @@ var stop_prices = {};
 var latest_cost_basis = {};
 
 function tradeUpdate(data) {
-  console.log(data);
+  //console.log(data);
+  console.log("Trade Update")
   var symbol = data.order["symbol"];
   var last_order = open_orders[symbol];
   if (last_order) {
@@ -173,6 +174,7 @@ function getHighBetween(lbound, ubound, symbol) {
 }
 var secondUpdatesReceived = 0;
 async function secondBar(subject, data) {
+  //console.log(stop_prices);
   secondUpdatesReceived++;
   // example second bar
   var symbol = data.sym;
@@ -221,8 +223,9 @@ async function secondBar(subject, data) {
     //TODO: double check that this object definition is accurate
     var submitted_at = new Date(existing_order.updated_at).getTime();
     var order_lifetime = ts - submitted_at;
-    console.log(existing_order);
+    //console.log(existing_order);
     if (order_lifetime / 1000 / 60 > 1) {
+      console.log("Cancelling Order for " + symbol);
       await alpaca.cancelOrder(existing_order.id);
 
     }
@@ -230,10 +233,10 @@ async function secondBar(subject, data) {
   }
   var since_market_open = ts - marketOpen.getTime();
   var until_market_close = marketClose.getTime() - ts;
-  console.log(ts);
+  //console.log(ts);
   if (
     since_market_open / 1000 / 60 > 15 &&
-    since_market_open / 1000 / 60 < 60 /*remove || true after debugging || true*/
+    since_market_open / 1000 / 60 < after_open_trade_min /*remove || true after debugging || true*/
   ) {
     // Check for buy signals
     console.log("It's the right time for buying");
@@ -288,11 +291,8 @@ async function secondBar(subject, data) {
       }
       // Stock has passed all checks; figure out how much to buy
       var stop_price = find_stop(data.c, minute_history[symbol], ts);
-      console.log(stop_price);
       stop_prices[symbol] = stop_price;
       target_prices[symbol] = data.c + (data.c - stop_price) * 3;
-      console.log(portfolio_value);
-      console.log(risk);
       var shares_to_buy = Math.floor(
         (portfolio_value * risk) / data.c//(data.c - stop_price)
       );
@@ -329,10 +329,11 @@ async function secondBar(subject, data) {
   //Begin Sell Logic
   if(since_market_open /1000 / 60 >= 24 || until_market_close /1000 / 60 > 15){
     // Check for liquidation signals
-    
+    //console.log("Checking for sell signals");
     // We can't liquidate if there's no position
     position = positions[symbol]
-    if(!position){
+    if(position == 0 || position == null || position == undefined){
+        //console.log("Returning because there's no position");
         return;
     }
 
@@ -340,15 +341,16 @@ async function secondBar(subject, data) {
     // Sell for a loss if it's below our cost basis and MACD < 0
     // Sell for a profit if it's above our target price
     var closingPrices = minute_history[symbol].ticks.map(o => o.c);
+    console.log(`Latest cost basis for ${symbol} is ${JSON.stringify(latest_cost_basis)}`);
+    console.log(positions);
     var hist = macd(closingPrices, 26, 12, 9);
     if (
         data.c <= stop_prices[symbol] ||
-        (data.c >= target_prices[symbol] && hist[hist.length-1].MACD <= 0) ||
-        (data.c <= latest_cost_basis[symbol] && hist[hist.length-1].MACD <= 0)
+        (data.c >= target_prices[symbol] && hist.MACD[hist.MACD.length-1] <= 0) ||
+        (data.c <= latest_cost_basis[symbol] && hist.MACD[hist.MACD.length-1]<= 0)
     ){
         console.log(`Submitting sell for ${position} shares of ${symbol} at ${data.c}`);
         try{
-          //Start here!!
           var o = await alpaca.createOrder({
             symbol:symbol,
             qty:position,
@@ -503,10 +505,12 @@ async function run(tickers) {
   }
 
   var existing_positions = await alpaca.getPositions();
+  console.log(existing_positions);
   for (var i = 0; i < existing_positions.length; i++) {
     if (symbols.includes(existing_positions[i].symbol)) {
+      
       positions[existing_positions[i].symbol] =
-        existing_positions[i].symbol.qty;
+        existing_positions[i].qty;
       //recalculate cost basis
       latest_cost_basis[existing_positions[i].symbol] =
         existing_positions[i].cost_basis;
@@ -531,7 +535,7 @@ async function run(tickers) {
       currentDateTime = new Date();
   }
   var tickers = await getTickers();
-  console.log(tickers);
-  setInterval(()=>{console.log(`Received ${secondUpdatesReceived} second updates so far`)},1000);
+  //console.log(tickers);
+  //setInterval(()=>{console.log(`Received ${secondUpdatesReceived} second updates so far`)},1000);
   await run(tickers, marketOpen, marketClose);
 })();

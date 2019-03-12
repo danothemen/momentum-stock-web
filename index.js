@@ -5,9 +5,9 @@ const alpaca = new Alpaca({keyId: key, secretKey: secret, paper: true});
 const macd = require("macd");
 const blessed = require("blessed");
 const contrib = require("blessed-contrib");
-var screen = blessed.screen();
+var screen = blessed.screen({smartCSR:true, autoPadding:false});
 var grid = new contrib.grid({rows: 12, cols: 12, screen: screen});
-var table = grid.set(0, 0, 12, 6, contrib.table, {
+var table = grid.set(2, 0, 10, 6, contrib.table, {
     keys: true,
     fg: 'white',
     interactive: false,
@@ -21,19 +21,27 @@ var table = grid.set(0, 0, 12, 6, contrib.table, {
     columnSpacing: 5, //in chars
     columnWidth: [4, 6, 6]/*in chars*/
 });
-var log = grid.set(0, 6, 12, 6, contrib.log, {
+var log = grid.set(2, 6, 10, 6, contrib.log, {
     fg: "green",
     selectedFg: "green",
     width: '30%',
     height: '30%',
     label: 'Server Log'
 });
+var numWatching = grid.set(0,0,2,2,blessed.box,{
+    content: 'Watching 0 Symbols',
+    tags: false,
+    border: {
+      type: 'none'
+    },
+  });
 
 screen.key([
     'escape', 'q', 'C-c'
 ], function (ch, key) {
     return process.exit(0);
 });
+screen.render();
 
 async function getAllTickers() {
     let snapshotUrl = `https://api.polygon.io/v2/snapshot/locale/us/markets/stocks/tickers?apiKey=${key}`;
@@ -109,6 +117,8 @@ async function get1000mHistoryData(symbols) {
         toReturn[symbol] = await alpaca.getHistoricAggregates("minute", symbol, {limit: 1000});
         //log.log(toReturn[symbol].ticks[0]);
     }
+    numWatching.setContent("Watching "+Object.keys(toReturn).length+" Symbols");
+    screen.render();
     return toReturn;
 }
 
@@ -519,7 +529,9 @@ async function run(tickers) {
     //   await snooze(1000);     log.log("Waiting for Market Open At " + marketOpen
     // + " in " + ((currentDateTime.getTime() - marketOpen.getTime()) / 1000) + "
     // seconds");     currentDateTime = new Date(); }
+    screen.render();
     var tickers = await getTickers();
+    screen.render();
     // log.log(tickers); setInterval(()=>{log.log(`Received ${secondUpdatesReceived}
     // second updates so far`)},1000);
     await run(tickers, marketOpen, marketClose);

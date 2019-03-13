@@ -18,8 +18,8 @@ var table = grid.set(2, 0, 10, 6, contrib.table, {
     type: "line",
     fg: "cyan"
   },
-  columnSpacing: 5, //in chars
-  columnWidth: [4, 6, 6] /*in chars*/
+  columnSpacing: 6, //in chars
+  columnWidth: [10, 10, 10,10,5,5,10,5] /*in chars*/
 });
 var log = grid.set(2, 6, 10, 6, contrib.log, {
   fg: "green",
@@ -160,6 +160,7 @@ var marketClose;
 var marketOpen;
 var symbols = [];
 var portfolio_value;
+var existing_positions = {};
 
 var stop_prices = {};
 var latest_cost_basis = {};
@@ -374,12 +375,6 @@ async function secondBar(subject, data) {
       }
     }
   }
-  table.setData({
-    headers: ["Sym", "Basis", "Stop"],
-    data: [["AAPL", 2, 3]]
-  });
-  table.focus();
-  screen.render();
   //Begin Sell Logic
   if (
     since_market_open / 1000 / 60 >= 24 ||
@@ -400,7 +395,7 @@ async function secondBar(subject, data) {
     log.log(
       `Latest cost basis for ${symbol} is ${JSON.stringify(latest_cost_basis)}`
     );
-    log.log(positions);
+    log.log(JSON.parse(positions));
     var hist = macd(closingPrices, 26, 12, 9);
     if (
       data.c <= stop_prices[symbol] ||
@@ -558,19 +553,20 @@ async function run(tickers) {
     await alpaca.cancelOrder(existing_orders[i].id);
   }
 
-  var existing_positions = await alpaca.getPositions();
-  log.log(JSON.stringify(existing_positions));
+  existing_positions = await alpaca.getPositions();
+  log.log(JSON.stringify(Object.keys(existing_positions[0])));
   for (var i = 0; i < existing_positions.length; i++) {
     if (symbols.includes(existing_positions[i].symbol)) {
       positions[existing_positions[i].symbol] = existing_positions[i].qty;
       //recalculate cost basis
       latest_cost_basis[existing_positions[i].symbol] =
-        existing_positions[i].cost_basis;
+        existing_positions[i].avg_entry_price;
       stop_prices[existing_positions[i].symbol] = parseFloat(
-        existing_positions[i].cost_basis * default_stop
+        existing_positions[i].avg_entry_price * default_stop
       );
     }
   }
+  log.log(JSON.stringify(positions));
   websocket.connect();
 }
 (async function() {
@@ -581,9 +577,38 @@ async function run(tickers) {
   marketClose = getMarketClose(calendarArr);
   marketOpen = getMarketOpen(calendarArr);
   var currentDateTime = new Date();
+  setInterval(async ()=>{
+    existing_positions = await alpaca.getPositions();
+    var headers = ["Symbol","Shares","Cost Basis","Value","Purchase","Price","Stop","MACD"];
+    var toDisplay = [];
+    for(var i =0; i < existing_positions.length; i++){
+      if(!stop_prices[existing_positions[i].symbol]){
+        stop_prices[existing_positions[i].symbol] = existing_positions[i].avg_entry_price * default_stop;
+      }
+
+      var hist;
+      if(minute_history[existing_positions[i].symbol]){
+        var closingPrices = minute_history[existing_positions[i].symbol].ticks.map(o => o.c);
+        var histl = macd(closingPrices, 26, 12, 9);
+        hist = histl.MACD[histl.MACD.length-1].toFixed(5);
+
+      }
+      else{
+        hist = "";
+      }
+
+      var toPush = [existing_positions[i].symbol,existing_positions[i].qty,existing_positions[i].cost_basis,existing_positions[i].market_value,existing_positions[i].avg_entry_price,existing_positions[i].current_price,stop_prices[existing_positions[i].symbol].toFixed(2)||"",hist];
+      toDisplay.push(toPush);
+    }
+    table.setData({
+      headers: headers,
+      data: toDisplay
+    });
+    screen.render();
+  },2000);
   while (currentDateTime.getTime() < marketOpen.getTime() + 60 * 1000 * 15) {
     await snooze(1000);
-    marketOpenBox.setContent("Market Opens in " + Math.floor((marketOpen.getTime() - currentDateTime.getTime()) / 1000) + " Seconds");
+    marketOpenBox.setContent("Will start trading in " + Math.floor((marketOpen.getTime() - currentDateTime.getTime()) / 1000) + " Seconds");
     screen.render();
     currentDateTime = new Date();
   }
@@ -592,5 +617,6 @@ async function run(tickers) {
   screen.render();
   // log.log(tickers); setInterval(()=>{log.log(`Received ${secondUpdatesReceived}
   // second updates so far`)},1000);
+  marketOpenBox.destroy();
   await run(tickers, marketOpen, marketClose);
 })();

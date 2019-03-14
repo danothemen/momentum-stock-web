@@ -32,12 +32,24 @@ var table = grid.set(2, 0, 10, 6, contrib.table, {
         5
     ]/*in chars*/
 });
-var log = grid.set(2, 6, 10, 6, contrib.log, {
-    fg: "green",
-    selectedFg: "green",
+var orderTable = grid.set(2, 6, 10, 6, contrib.table, {
+    keys: true,
+    fg: "white",
+    interactive: false,
+    label: "Positions",
     width: "30%",
     height: "30%",
-    label: "Server Log"
+    border: {
+        type: "line",
+        fg: "cyan"
+    },
+    columnSpacing: 6, //in chars
+    columnWidth: [
+        10,
+        10,
+        10,
+        10,
+    ]/*in chars*/
 });
 var numWatching = grid.set(0, 0, 2, 2, blessed.box, {
     content: "Watching 0 Symbols",
@@ -134,7 +146,6 @@ async function get1000mHistoryData(symbols) {
     for (var i = 0; i < symbols.length; i++) {
         var symbol = symbols[i];
         toReturn[symbol] = await alpaca.getHistoricAggregates("minute", symbol, {limit: 1000});
-        //log.log(toReturn[symbol].ticks[0]);
     }
     numWatching.setContent("Watching " + Object.keys(toReturn).length + " Symbols");
     screen.render();
@@ -158,6 +169,31 @@ async function getTickers() {
         });
 }
 var open_orders = {};
+/*Example Open Orders Obj
+{"LPCN":
+{"id":"126413ba-1c12-4c0d-b035-07749a42249a",
+"client_order_id":"40364bec-6955-4775-8aba-8f02d2884847",
+"created_at":"2019-03-13T16:48:47.251895556Z",
+"updated_at":"2019-03-13T16:48:47.257155238Z",
+"submitted_at":"2019-03-13T16:48:47.225307042Z",
+"filled_at":null,
+"expired_at":null,
+"canceled_at":null,
+"failed_at":null,
+"asset_id":"ec8545ca-7f56-414a-977f-877d8d7193e0",
+"symbol":"LPCN",
+"asset_class":"us_equity",
+"qty":"2225",
+"filled_qty":"0",
+"filled_avg_price":null,
+"order_type":"limit",
+"type":"limit",
+"side":"sell",
+"time_in_force":"day",
+"limit_price":"2.02",
+"stop_price":null,
+"status":"new"}}
+*/
 var positions = {};
 var volume_today = {};
 var prev_closes = {};
@@ -174,8 +210,6 @@ var stop_prices = {};
 var latest_cost_basis = {};
 
 function tradeUpdate(data) {
-    //log.log(data);
-    log.log("Trade Update");
     var symbol = data.order["symbol"];
     var last_order = open_orders[symbol];
     if (last_order) {
@@ -206,7 +240,6 @@ function tradeUpdate(data) {
 }
 function getIndexForTimeStamp(symbol, ts) {
     if (minute_history[symbol]) {
-        //log.log(minute_history[symbol].ticks);
         for (var i = 0; i < minute_history[symbol].ticks.length; i++) {
             if (minute_history[symbol].ticks.t == ts) {
                 return i;
@@ -214,6 +247,39 @@ function getIndexForTimeStamp(symbol, ts) {
         }
     }
     return -1;
+}
+function displayOpenOrders(){
+    /*{"LPCN":
+{"id":"126413ba-1c12-4c0d-b035-07749a42249a",
+"client_order_id":"40364bec-6955-4775-8aba-8f02d2884847",
+"created_at":"2019-03-13T16:48:47.251895556Z",
+"updated_at":"2019-03-13T16:48:47.257155238Z",
+"submitted_at":"2019-03-13T16:48:47.225307042Z",
+"filled_at":null,
+"expired_at":null,
+"canceled_at":null,
+"failed_at":null,
+"asset_id":"ec8545ca-7f56-414a-977f-877d8d7193e0",
+"symbol":"LPCN",
+"asset_class":"us_equity",
+"qty":"2225",
+"filled_qty":"0",
+"filled_avg_price":null,
+"order_type":"limit",
+"type":"limit",
+"side":"sell",
+"time_in_force":"day",
+"limit_price":"2.02",
+"stop_price":null,
+"status":"new"}}*/
+    var headers = ['Symb','Qty','Limit','Created'];
+    var toDisplay = [];
+    var openKeys = Object.keys(open_orders);
+    for(var i = 0; i < openKeys.length; i++){
+        var toPush = [open_orders[openKeys[i]].symbol,open_orders[openKeys[i]].qty,open_orders[openKeys[i]].limit_price,open_orders[openKeys[i]].created_at];
+        toDisplay.push(toPush);
+    }
+    orderTable.setData({headers: headers, data: toDisplay});
 }
 function getHighBetween(lbound, ubound, symbol) {
     var toSearch = minute_history[symbol]
@@ -231,7 +297,6 @@ function getHighBetween(lbound, ubound, symbol) {
 }
 var secondUpdatesReceived = 0;
 async function secondBar(subject, data) {
-    //log.log(stop_prices);
     secondUpdatesReceived++;
     // example second bar
     var symbol = data.sym;
@@ -269,27 +334,21 @@ async function secondBar(subject, data) {
     }
     var existing_order = open_orders[symbol];
     if (existing_order) {
-        log.log("Returning because of existing order");
         //TODO: double check that this object definition is accurate
         var submitted_at = new Date(existing_order.updated_at).getTime();
         var order_lifetime = ts - submitted_at;
-        //log.log(existing_order);
         if (order_lifetime / 1000 / 60 > 1) {
-            log.log("Cancelling Order for " + symbol);
             await alpaca.cancelOrder(existing_order.id);
         }
         return;
     }
     var since_market_open = ts - marketOpen.getTime();
     var until_market_close = marketClose.getTime() - ts;
-    //log.log(ts);
     if (since_market_open / 1000 / 60 > 15 && since_market_open / 1000 / 60 < after_open_trade_min/*remove || true after debugging || true*/) {
         // Check for buy signals
-        //log.log("It's the right time for buying");
         // See if we've already bought in first
         var position = positions[symbol];
         if (position > 0) {
-            //log.log("Returning because of existing position");
             return;
         }
 
@@ -300,7 +359,6 @@ async function secondBar(subject, data) {
         if (minute_history[symbol]) {
             high_15m = getHighBetween(lbound, ubound, symbol);
         } else {
-            log.log("Returning because of invalid minute history");
             // Because we're aggregating on the fly, sometimes the datetime index can get
             // messy until it's healed by the minute bars
             return;
@@ -308,7 +366,6 @@ async function secondBar(subject, data) {
 
         // Get the change since yesterday's market close
         daily_pct_change = (data.c - prev_closes[symbol]) / prev_closes[symbol];
-        //log.log(high_15m);
         if (daily_pct_change > pctForBuy && data.c > high_15m && volume_today[symbol] > 30000) {
             // check for a positive, increasing MACD
             var closingPrices = minute_history[symbol]
@@ -339,8 +396,6 @@ async function secondBar(subject, data) {
                 return;
             }
 
-            //log.log(`Submitting buy for ${shares_to_buy} shares of ${symbol} at ${data.c}`);
-
             try {
                 var o = await alpaca.createOrder({
                     symbol: symbol,
@@ -353,7 +408,6 @@ async function secondBar(subject, data) {
                 open_orders[symbol] = o;
                 latest_cost_basis[symbol] = data.c;
             } catch (e) {
-                //log.log(e);
                 errorLog += JSON.stringify(e)+"\n";
             }
         }
@@ -364,7 +418,6 @@ async function secondBar(subject, data) {
         // liquidate if there's no position
         position = positions[symbol];
         if (position == 0 || position == null || position == undefined) {
-            //log.log("Returning because there's no position");
             return;
         }
 
@@ -374,13 +427,10 @@ async function secondBar(subject, data) {
         var closingPrices = minute_history[symbol]
             .ticks
             .map(o => o.c);
-        //log.log(`Latest cost basis for ${symbol} is ${JSON.stringify(latest_cost_basis)}`);
-        //log.log(JSON.parse(positions));
         var hist = macd(closingPrices, 26, 12, 9);
         if (data.c <= stop_prices[symbol] || (data.c >= target_prices[symbol] && hist.MACD[hist.MACD.length - 1] <= 0) || (data.c <= latest_cost_basis[symbol] && hist.MACD[hist.MACD.length - 1] <= 0)) {
             
             try {
-              //log.log(`Submitting sell for ${position} shares of ${symbol} at ${data.c}`);
                 var o = await alpaca.createOrder({
                     symbol: symbol,
                     qty: position,
@@ -392,7 +442,6 @@ async function secondBar(subject, data) {
                 open_orders[symbol] = o;
                 latest_cost_basis[symbol] = data.c;
             } catch (e) {
-                //log.log(e);
                 errorLog += JSON.stringify(e)+"\n";
             }
         }
@@ -408,7 +457,6 @@ async function secondBar(subject, data) {
             errorLog += JSON.stringify(e)+"\n";
             return;
         }
-        //log.log(`Trading over, liquidating remaining position in ${symbol}`);
         var o = await alpaca.createOrder({
             symbol: symbol,
             qty: position.qty,
@@ -442,7 +490,6 @@ async function secondBar(subject, data) {
 }
 function minuteBar(subject, data) {
     var ts = new Date(data.s);
-    //log.log(symbol); log.log(subject);
     var minute = new Date(ts.getFullYear(), ts.getMonth(), ts.getDate(), ts.getHours(), ts.getMinutes, 0, 0);
     ts = minute.getTime();
 
@@ -500,18 +547,13 @@ async function run(tickers) {
         symbols.push(tickers[i].ticker);
     }
     websocket.onStateChange(newState => {
-        log.log(`State changed to ${newState}`);
     });
     websocket.onConnect(() => {
-        log.log("Connected WebSocket");
         websocket.subscribe(toSubscribe);
-        log.log(JSON.stringify(websocket.subscriptionState));
     });
     websocket.onDisconnect(() => {
-        log.log("Web Socket Disconnected");
     });
     websocket.onError(() => {
-        log.log("Error");
     });
 
     minute_history = await get1000mHistoryData(symbols);
@@ -523,7 +565,6 @@ async function run(tickers) {
     }
 
     existing_positions = await alpaca.getPositions();
-    log.log(JSON.stringify(Object.keys(existing_positions[0])));
     for (var i = 0; i < existing_positions.length; i++) {
         if (symbols.includes(existing_positions[i].symbol)) {
             positions[existing_positions[i].symbol] = existing_positions[i].qty;
@@ -532,7 +573,6 @@ async function run(tickers) {
             stop_prices[existing_positions[i].symbol] = parseFloat(existing_positions[i].avg_entry_price * default_stop);
         }
     }
-    log.log(JSON.stringify(positions));
     websocket.connect();
 }(async function () {
     var calendarArr = await alpaca.getCalendar({start: new Date(), end: new Date()});
@@ -599,7 +639,6 @@ while (currentDateTime.getTime() < marketOpen.getTime() + 60 * 1000 * 15) {
 screen.render();
 var tickers = await getTickers();
 screen.render();
-// log.log(tickers); setInterval(()=>{log.log(`Received ${secondUpdatesReceived}
 // second updates so far`)},1000);
 marketOpenBox.destroy();
 await run(tickers, marketOpen, marketClose);

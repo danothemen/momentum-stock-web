@@ -626,6 +626,7 @@ async function run(tickers) {
                 toDisplay.push(toPush);
               }
               table.setData({headers: headers, data: toDisplay});
+              displayOpenOrders();
               screen.render();
         } catch (err) {errorLog += JSON.stringify(err)+"\n";}
     },

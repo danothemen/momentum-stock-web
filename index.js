@@ -630,10 +630,10 @@ async function run(tickers) {
               screen.render();
         } catch (err) {errorLog += JSON.stringify(err)+"\n";}
     },
-2000);
+10000);
 while (currentDateTime.getTime() < marketOpen.getTime() + 60 * 1000 * 15) {
     await snooze(1000);
-    marketOpenBox.setContent("Will start trading in " + Math.floor((marketOpen.getTime() - currentDateTime.getTime()) / 1000) + " Seconds");
+    marketOpenBox.setContent("Will start trading in " + Math.floor(((marketOpen.getTime()+ 60 * 1000 * 15) - currentDateTime.getTime()) / 1000) + " Seconds");
     screen.render();
     currentDateTime = new Date();
 }

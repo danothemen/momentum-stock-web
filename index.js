@@ -3,76 +3,8 @@ const key = "PKEEM7SJ5LQ1429CGPAK";
 const secret = "7prDOquO7qIwnu/40CKIfDSRoYniMjQTYgSb9eZC";
 const alpaca = new Alpaca({keyId: key, secretKey: secret, paper: true});
 const macd = require("macd");
-const blessed = require("blessed");
-const contrib = require("blessed-contrib");
-var screen = blessed.screen();
-var grid = new contrib.grid({rows: 12, cols: 12, screen: screen});
 var errorLog = "";
 const fs = require("fs");
-var table = grid.set(2, 0, 10, 6, contrib.table, {
-    keys: true,
-    fg: "white",
-    interactive: false,
-    label: "Positions",
-    width: "30%",
-    height: "30%",
-    border: {
-        type: "line",
-        fg: "cyan"
-    },
-    columnSpacing: 6, //in chars
-    columnWidth: [
-        10,
-        10,
-        10,
-        10,
-        5,
-        5,
-        10,
-        5
-    ]/*in chars*/
-});
-var orderTable = grid.set(2, 6, 10, 6, contrib.table, {
-    keys: true,
-    fg: "white",
-    interactive: false,
-    label: "Positions",
-    width: "30%",
-    height: "30%",
-    border: {
-        type: "line",
-        fg: "cyan"
-    },
-    columnSpacing: 6, //in chars
-    columnWidth: [
-        10,
-        10,
-        10,
-        10,
-    ]/*in chars*/
-});
-var numWatching = grid.set(0, 0, 2, 2, blessed.box, {
-    content: "Watching 0 Symbols",
-    tags: false,
-    border: {
-        type: "none"
-    }
-});
-var marketOpenBox = grid.set(0, 2, 2, 2, blessed.box, {
-    content: "Market Opens In Nan Seconds",
-    tags: false,
-    border: {
-        type: "none"
-    }
-});
-
-screen.key([
-    "escape", "q", "C-c"
-], function (ch, key) {
-    fs.writeFileSync("error.log",errorLog);
-    return process.exit(0);
-});
-screen.render();
 
 async function getAllTickers() {
     let snapshotUrl = `https://api.polygon.io/v2/snapshot/locale/us/markets/stocks/tickers?apiKey=${key}`;
@@ -147,8 +79,6 @@ async function get1000mHistoryData(symbols) {
         var symbol = symbols[i];
         toReturn[symbol] = await alpaca.getHistoricAggregates("minute", symbol, {limit: 1000});
     }
-    numWatching.setContent("Watching " + Object.keys(toReturn).length + " Symbols");
-    screen.render();
     return toReturn;
 }
 
@@ -279,7 +209,6 @@ function displayOpenOrders(){
         var toPush = [open_orders[openKeys[i]].symbol,open_orders[openKeys[i]].qty,open_orders[openKeys[i]].limit_price,open_orders[openKeys[i]].created_at];
         toDisplay.push(toPush);
     }
-    orderTable.setData({headers: headers, data: toDisplay});
 }
 function getHighBetween(lbound, ubound, symbol) {
     var toSearch = minute_history[symbol]
@@ -625,22 +554,14 @@ async function run(tickers) {
                 ];
                 toDisplay.push(toPush);
               }
-              table.setData({headers: headers, data: toDisplay});
-              displayOpenOrders();
-              screen.render();
         } catch (err) {errorLog += JSON.stringify(err)+"\n";}
     },
 10000);
 while (currentDateTime.getTime() < marketOpen.getTime() + 60 * 1000 * 15) {
     await snooze(1000);
-    marketOpenBox.setContent("Will start trading in " + Math.floor(((marketOpen.getTime()+ 60 * 1000 * 15) - currentDateTime.getTime()) / 1000) + " Seconds");
-    screen.render();
     currentDateTime = new Date();
 }
-screen.render();
 var tickers = await getTickers();
-screen.render();
 // second updates so far`)},1000);
-marketOpenBox.destroy();
 await run(tickers, marketOpen, marketClose);
 })();

@@ -1,3 +1,6 @@
+/*
+    Trade Logic Below
+*/
 const Alpaca = require("@alpacahq/alpaca-trade-api");
 const key = "PKEEM7SJ5LQ1429CGPAK";
 const secret = "7prDOquO7qIwnu/40CKIfDSRoYniMjQTYgSb9eZC";

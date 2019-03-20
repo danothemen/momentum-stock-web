@@ -1,11 +1,20 @@
 import React from "react";
 import ReactDOM from "react-dom";
+import Positions from "./components/positioncomponent";
+import * as SocketClient from "./websocketclient";
 
-class HelloMessage extends React.Component {
+class Dashboard extends React.Component {
+  posUpdate(pos){
+    this.setState({positions:pos});
+  }
+  componentDidMount(){
+    SocketClient.onPositionUpdate(this.posUpdate);
+    SocketClient.connect();
+  }
   render() {
-    return <div>Hello {this.props.name}</div>;
+    return <Positions data={this.state ? this.state.positions : ""} />;
   }
 }
 
 var mountNode = document.getElementById("app");
-ReactDOM.render(<HelloMessage name="Jane" />, mountNode);
+ReactDOM.render(<Dashboard />, mountNode);

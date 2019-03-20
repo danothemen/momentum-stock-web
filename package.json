@@ -5,12 +5,24 @@
   "main": "index.js",
   "dependencies": {
     "@alpacahq/alpaca-trade-api": "^1.0.2",
+    "express": "^4.16.4",
+    "express-ws": "^4.0.0",
     "macd": "^1.0.2",
+    "react": "^16.8.4",
+    "react-dom": "^16.8.4",
     "request": "^2.88.0"
   },
-  "devDependencies": {},
+  "devDependencies": {
+    "babel-core": "^6.26.3",
+    "babel-preset-env": "^1.7.0",
+    "babel-preset-react": "^6.24.1",
+    "parcel-bundler": "^1.12.2"
+  },
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "parcel:dev": "./node_modules/.bin/parcel index.html",
+    "parcel:watch": "./node_modules/.bin/parcel watch index.html",
+    "build": "./node_modules/.bin/parcel build index.html"
   },
   "author": "",
   "license": "ISC"

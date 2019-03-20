@@ -6,8 +6,17 @@ const key = "PKEEM7SJ5LQ1429CGPAK";
 const secret = "7prDOquO7qIwnu/40CKIfDSRoYniMjQTYgSb9eZC";
 const alpaca = new Alpaca({keyId: key, secretKey: secret, paper: true});
 const macd = require("macd");
-var errorLog = "";
 const fs = require("fs");
+
+/*
+    Callbacks
+*/
+var secondCallback;
+var minuteCallback;
+var positionsChanged;
+var targetPricesChanged;
+var priceUpdate;
+var macdUpdated;
 
 async function getAllTickers() {
     let snapshotUrl = `https://api.polygon.io/v2/snapshot/locale/us/markets/stocks/tickers?apiKey=${key}`;
@@ -48,6 +57,22 @@ default_stop = 0.95;
 risk = 0.05;
 
 var pctForBuy = 0.04;
+
+var positions = {};
+var volume_today = {};
+var prev_closes = {};
+var target_prices = {};
+var partial_fills = {};
+var minute_history = {};
+var marketClose;
+var marketOpen;
+var symbols = [];
+var portfolio_value;
+var existing_positions = {};
+var open_orders = {};
+
+var stop_prices = {};
+var latest_cost_basis = {};
 
 function find_stop(current_value, minute_historyinf, now) {
     //TODO: Need more sophisticated stop loss algorithm
@@ -101,7 +126,7 @@ async function getTickers() {
             return toReturn;
         });
 }
-var open_orders = {};
+
 /*Example Open Orders Obj
 {"LPCN":
 {"id":"126413ba-1c12-4c0d-b035-07749a42249a",
@@ -127,20 +152,7 @@ var open_orders = {};
 "stop_price":null,
 "status":"new"}}
 */
-var positions = {};
-var volume_today = {};
-var prev_closes = {};
-var target_prices = {};
-var partial_fills = {};
-var minute_history = {};
-var marketClose;
-var marketOpen;
-var symbols = [];
-var portfolio_value;
-var existing_positions = {};
 
-var stop_prices = {};
-var latest_cost_basis = {};
 
 function tradeUpdate(data) {
     var symbol = data.order["symbol"];
@@ -227,7 +239,7 @@ function getHighBetween(lbound, ubound, symbol) {
     }
     return high;
 }
-var secondUpdatesReceived = 0;
+
 async function secondBar(subject, data) {
     secondUpdatesReceived++;
     // example second bar
@@ -235,7 +247,6 @@ async function secondBar(subject, data) {
     var ts = new Date(data.s);
     var minute = new Date(ts.getFullYear(), ts.getMonth(), ts.getDate(), ts.getHours(), ts.getMinutes(), 0, 0);
     ts = minute.getTime();
-    errorLog += JSON.stringify(open_orders);
     var indexForTs = getIndexForTimeStamp(symbol, ts);
     if (indexForTs > -1) {
         minute_history[symbol].ticks[indexForTs] = {
@@ -340,7 +351,7 @@ async function secondBar(subject, data) {
                 open_orders[symbol] = o;
                 latest_cost_basis[symbol] = data.c;
             } catch (e) {
-                errorLog += JSON.stringify(e)+"\n";
+                console.log(e);
             }
         }
     }
@@ -374,7 +385,7 @@ async function secondBar(subject, data) {
                 open_orders[symbol] = o;
                 latest_cost_basis[symbol] = data.c;
             } catch (e) {
-                errorLog += JSON.stringify(e)+"\n";
+                console.log(e);
             }
         }
         return;
@@ -386,7 +397,7 @@ async function secondBar(subject, data) {
             position = await alpaca.getPosition(symbol);
         } catch (e) {
             // Exception here indicates that we have no position
-            errorLog += JSON.stringify(e)+"\n";
+            console.log(e);
             return;
         }
         var o = await alpaca.createOrder({
@@ -506,25 +517,26 @@ async function run(tickers) {
         }
     }
     websocket.connect();
-}(async function () {
+}
+async function startTrader () {
     var calendarArr = await alpaca.getCalendar({start: new Date(), end: new Date()});
     marketClose = getMarketClose(calendarArr);
     marketOpen = getMarketOpen(calendarArr);
     var currentDateTime = new Date();
     existing_positions = await alpaca.getPositions();
+    
+while (currentDateTime.getTime() < marketOpen.getTime() + 60 * 1000 * 15) {
+    await snooze(1000);
+    currentDateTime = new Date();
+}
+var tickers = await getTickers();
+// second updates so far`)},1000);
+await run(tickers, marketOpen, marketClose);
+};
+function subscribeToPositions(){
     setInterval(async() => {
         try {
             existing_positions = await alpaca.getPositions();
-            var headers = [
-                "Symbol",
-                "Shares",
-                "Cost Basis",
-                "Value",
-                "Purchase",
-                "Price",
-                "Stop",
-                "MACD"
-            ];
             var toDisplay = [];
             for (var i = 0; i < existing_positions.length; i++) {
                 if (!stop_prices[existing_positions[i].symbol]) {
@@ -557,14 +569,11 @@ async function run(tickers) {
                 ];
                 toDisplay.push(toPush);
               }
-        } catch (err) {errorLog += JSON.stringify(err)+"\n";}
+              if(typeof positionsChanged == "function"){
+                  positionsChanged(toDisplay);
+              }
+        } catch (err) {console.log(err);}
     },
 10000);
-while (currentDateTime.getTime() < marketOpen.getTime() + 60 * 1000 * 15) {
-    await snooze(1000);
-    currentDateTime = new Date();
 }
-var tickers = await getTickers();
-// second updates so far`)},1000);
-await run(tickers, marketOpen, marketClose);
-})();
+module.exports.StartTrader = startTrader;

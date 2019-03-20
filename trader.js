@@ -570,10 +570,12 @@ function subscribeToPositions(){
                 toDisplay.push(toPush);
               }
               if(typeof positionsChanged == "function"){
-                  positionsChanged(toDisplay);
+                  positionsChanged(existing_positions);
               }
         } catch (err) {console.log(err);}
     },
 10000);
 }
 module.exports.StartTrader = startTrader;
+module.exports.PositionsChanged = (func)=>{positionsChanged = func;};
+module.exports.SubscribeToPositions = subscribeToPositions;

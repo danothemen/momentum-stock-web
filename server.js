@@ -8,6 +8,8 @@ var expressWs = require('express-ws')(app);
 app.ws('/', function(ws, req) {
     ws.on('message', function(msg) {
       console.log(msg);
+      var toSend = trader.getPositions();
+      ws.send(JSON.stringify({type:"positions",data:toSend}));
     });
     console.log('socket');
   });

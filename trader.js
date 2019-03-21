@@ -578,4 +578,5 @@ function subscribeToPositions(){
 }
 module.exports.StartTrader = startTrader;
 module.exports.PositionsChanged = (func)=>{positionsChanged = func;};
+module.exports.getPositions = ()=>{existing_positions};
 module.exports.SubscribeToPositions = subscribeToPositions;

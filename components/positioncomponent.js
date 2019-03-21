@@ -19,6 +19,8 @@ class Positions extends React.Component {
             <th>Cost Basis</th>
             <th>Market Value</th>
             <th>Current Price</th>
+            <th>Stop Price</th>
+            <th>MACD</th>
           </tr>
         </thead>
         <tbody>
@@ -32,6 +34,8 @@ class Positions extends React.Component {
               <td>{pos.cost_basis}</td>
               <td>{pos.market_value}</td>
               <td>{pos.current_price}</td>
+              <td>{pos.stop_price}</td>
+              <td>{pos.macd}</td>
             </tr>
             )
           })}

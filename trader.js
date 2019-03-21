@@ -537,6 +537,11 @@ function subscribeToPositions(){
     setInterval(async() => {
         try {
             existing_positions = await alpaca.getPositions();
+            console.log(minute_history);
+            if(minute_history == null || minute_history == {}){
+                var mySymbols = existing_positions.map(o => o.symbol);
+                minute_history = await get1000mHistoryData(mySymbols);
+            }
             var toDisplay = [];
             for (var i = 0; i < existing_positions.length; i++) {
                 if (!stop_prices[existing_positions[i].symbol]) {
@@ -568,6 +573,8 @@ function subscribeToPositions(){
                     hist
                 ];
                 toDisplay.push(toPush);
+                existing_positions[i].stop_price = stop_prices[existing_positions[i].symbol].toFixed(2) || "";
+                existing_positions[i].macd = hist;
               }
               if(typeof positionsChanged == "function"){
                   positionsChanged(existing_positions);

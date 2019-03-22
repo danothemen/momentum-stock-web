@@ -1,6 +1,7 @@
 import React from "react";
 import ReactDOM from "react-dom";
 import Positions from "./components/positioncomponent";
+import MACDDisplay from "./components/macddisplay";
 import * as SocketClient from "./websocketclient";
 
 class Dashboard extends React.Component {
@@ -18,10 +19,17 @@ class Dashboard extends React.Component {
   componentDidMount(){
     SocketClient.setComponentRef(this);
     SocketClient.onPositionUpdate(this.posUpdate);
+    SocketClient.onMacd(this.macdUpdate);
     SocketClient.connect();
   }
   render() {
-    return <Positions data={this.state ? this.state.positions : ""} />;
+    return (
+    <div>
+      <Positions data={this.state ? this.state.positions : ""} />
+      {this.state.positions.map(pos =>{
+        return <MACDDisplay symbol={pos.symbol} macddata={pos.macddata}/>
+      })}
+    </div>);
   }
 }
 

@@ -27,6 +27,10 @@ function setComponentRef(reactcomp){
 function onPositionUpdate(del) {
     onPositions = del;
 }
+function onMacd(del){
+    onMacd = del;
+}
 module.exports.connect = connect;
 module.exports.onPositionUpdate = onPositionUpdate;
 module.exports.setComponentRef = setComponentRef;
+module.exports.onMacd = onMacd;

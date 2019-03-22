@@ -7,6 +7,14 @@ class Dashboard extends React.Component {
   posUpdate(pos, myself){
     myself.setState({positions:pos});
   }
+  macdUpdate(macd,symbol,myself){
+    for(var i = 0; i < this.state.positions.length; i++){
+      if(this.state.positions.symbol == symbol){
+        this.state.positions.macddata = macd;
+        myself.setState(this.state);
+      }
+    }
+  }
   componentDidMount(){
     SocketClient.setComponentRef(this);
     SocketClient.onPositionUpdate(this.posUpdate);

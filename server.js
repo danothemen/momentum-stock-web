@@ -15,10 +15,16 @@ app.ws('/', function(ws, req) {
   });
 
 trader.PositionsChanged(function(positions){
-    console.log(positions);
+    //console.log(positions);
     expressWs.getWss().clients.forEach(client=>{
         client.send(JSON.stringify({type:"positions",data:positions}));
     });
+});
+trader.MACDUpdate(function(macd,symbol){
+  //console.log(positions);
+  expressWs.getWss().clients.forEach(client=>{
+      client.send(JSON.stringify({type:"macd",data:macd,symbol:symbol}));
+  });
 });
 trader.SubscribeToPositions();
 

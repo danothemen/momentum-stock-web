@@ -15,9 +15,9 @@ class Positions extends React.Component {
             <th>Symbol</th>
             <th>Exchange</th>
             <th>Qty</th>
-            <th>Avg. Buy</th>
             <th>Cost Basis</th>
             <th>Market Value</th>
+            <th>Avg. Buy</th>
             <th>Current Price</th>
             <th>Stop Price</th>
             <th>MACD</th>
@@ -30,9 +30,9 @@ class Positions extends React.Component {
               <td>{pos.symbol}</td>
               <td>{pos.exchange}</td>
               <td>{pos.qty}</td>
-              <td>{pos.avg_entry_price}</td>
               <td>{pos.cost_basis}</td>
               <td>{pos.market_value}</td>
+              <td>{pos.avg_entry_price}</td>
               <td>{pos.current_price}</td>
               <td>{pos.stop_price}</td>
               <td>{pos.macd}</td>

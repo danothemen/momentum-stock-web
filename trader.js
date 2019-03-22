@@ -370,7 +370,10 @@ async function secondBar(subject, data) {
         var closingPrices = minute_history[symbol]
             .ticks
             .map(o => o.c);
-        var hist = macd(closingPrices, 26, 12, 9);
+        var hist = macd(closingPrices, 13, 21, 9);
+        if(typeof macdUpdated == "function"){
+            macdUpdated(hist,symbol)
+        }
         if (data.c <= stop_prices[symbol] || (data.c >= target_prices[symbol] && hist.MACD[hist.MACD.length - 1] <= 0) || (data.c <= latest_cost_basis[symbol] && hist.MACD[hist.MACD.length - 1] <= 0)) {
             
             try {
@@ -538,9 +541,12 @@ function subscribeToPositions(){
         try {
             existing_positions = await alpaca.getPositions();
             console.log(minute_history);
-            if(minute_history == null || minute_history == {}){
+            
+            if(Object.keys(minute_history).length == 0 && existing_positions.length > 0){
                 var mySymbols = existing_positions.map(o => o.symbol);
+                console.log("Getting Minute History");
                 minute_history = await get1000mHistoryData(mySymbols);
+                console.log("Got Minute History");
             }
             var toDisplay = [];
             for (var i = 0; i < existing_positions.length; i++) {
@@ -553,7 +559,10 @@ function subscribeToPositions(){
                     var closingPrices = minute_history[existing_positions[i].symbol]
                         .ticks
                         .map(o => o.c);
-                    var histl = macd(closingPrices, 26, 12, 9);
+                    var histl = macd(closingPrices, 13, 21, 9);
+                    if(typeof macdUpdated == "function"){
+                        macdUpdated(histl,existing_positions[i].symbol);
+                    }
                     hist = histl
                         .MACD[histl.MACD.length - 1]
                         .toFixed(5);
@@ -586,4 +595,5 @@ function subscribeToPositions(){
 module.exports.StartTrader = startTrader;
 module.exports.PositionsChanged = (func)=>{positionsChanged = func;};
 module.exports.getPositions = ()=>{existing_positions};
+module.exports.MACDUpdate = (func)=>{macdUpdated = func;};
 module.exports.SubscribeToPositions = subscribeToPositions;

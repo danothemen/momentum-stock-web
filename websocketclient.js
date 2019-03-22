@@ -13,8 +13,11 @@ function connect() {
                     onPositions(msg.data,component);
                 }
                 break;
-            case "pricemacd":
-
+            case "macd":
+                if(typeof onMacd == "function"){
+                    onMacd(msg.data,msg.symbol,component);
+                }
+                break;
         }
     }
 }

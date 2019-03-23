@@ -16,6 +16,7 @@ var minuteCallback;
 var positionsChanged;
 var targetPricesChanged;
 var priceUpdate;
+var orderUpdate;
 var macdUpdated;
 
 async function getAllTickers() {
@@ -152,7 +153,35 @@ async function getTickers() {
 "stop_price":null,
 "status":"new"}}
 */
-
+function sendOpenOrders(){
+    if(typeof orderUpdate == "function"){
+        //orderUpdate(open_orders);
+        var testOrder = {"LPCN":
+{"id":"126413ba-1c12-4c0d-b035-07749a42249a",
+"client_order_id":"40364bec-6955-4775-8aba-8f02d2884847",
+"created_at":"2019-03-13T16:48:47.251895556Z",
+"updated_at":"2019-03-13T16:48:47.257155238Z",
+"submitted_at":"2019-03-13T16:48:47.225307042Z",
+"filled_at":null,
+"expired_at":null,
+"canceled_at":null,
+"failed_at":null,
+"asset_id":"ec8545ca-7f56-414a-977f-877d8d7193e0",
+"symbol":"LPCN",
+"asset_class":"us_equity",
+"qty":"2225",
+"filled_qty":"0",
+"filled_avg_price":null,
+"order_type":"limit",
+"type":"limit",
+"side":"sell",
+"time_in_force":"day",
+"limit_price":"2.02",
+"stop_price":null,
+"status":"new"}};
+orderUpdate(testOrder);
+    }
+}
 
 function tradeUpdate(data) {
     var symbol = data.order["symbol"];
@@ -176,12 +205,13 @@ function tradeUpdate(data) {
             positions[symbol] = (positions[symbol] || 0) - (partial_fills[symbol] || 0);
             partial_fills[symbol] = 0;
             positions[symbol] += qty;
-            open_orders[symbol] = null;
+            delete open_orders[symbol];
         } else if (event == "canceled" || event == "rejected") {
             partial_fills[symbol] = 0;
-            open_orders[symbol] = null;
+            delete open_orders[symbol];
         }
     }
+    sendOpenOrders();
 }
 function getIndexForTimeStamp(symbol, ts) {
     if (minute_history[symbol]) {
@@ -315,12 +345,12 @@ async function secondBar(subject, data) {
                 .ticks
                 .map(o => o.c);
             var hist = macd(closingPrices, 26, 12, 9);
-            if (hist.MACD[hist.MACD.length - 1] < 0 || !(hist.MACD[hist.MACD.length - 3] < hist.MACD[hist.MACD.length - 2] < hist.MACD[hist.MACD.length - 1])) {
+            if (hist.histogram[hist.histogram.length - 1] < 0 || !(hist.histogram[hist.histogram.length - 3] < hist.histogram[hist.histogram.length - 2] < hist.histogram[hist.histogram.length - 1])) {
                 return;
             }
             hist = macd(closingPrices, 60, 40, 9); //TODO: Ask about on slack
 
-            if (hist.MACD[hist.MACD.length - 1] < 0 || hist.MACD[hist.MACD.length - 1] - hist.MACD[hist.MACD.length - 2] < 0) {
+            if (hist.histogram[hist.histogram.length - 1] < 0 || hist.histogram[hist.histogram.length - 1] - hist.histogram[hist.histogram.length - 2] < 0) {
                 return;
             }
             // Stock has passed all checks; figure out how much to buy
@@ -350,6 +380,8 @@ async function secondBar(subject, data) {
                 });
                 open_orders[symbol] = o;
                 latest_cost_basis[symbol] = data.c;
+                sendOpenOrders();
+
             } catch (e) {
                 console.log(e);
             }
@@ -374,7 +406,7 @@ async function secondBar(subject, data) {
         if(typeof macdUpdated == "function"){
             macdUpdated(hist,symbol)
         }
-        if (data.c <= stop_prices[symbol] || (data.c >= target_prices[symbol] && hist.MACD[hist.MACD.length - 1] <= 0) || (data.c <= latest_cost_basis[symbol] && hist.MACD[hist.MACD.length - 1] <= 0)) {
+        if (data.c <= stop_prices[symbol] || (data.c >= target_prices[symbol] && hist.histogram[hist.histogram.length - 1] <= 0) || (data.c <= latest_cost_basis[symbol] && hist.histogram[hist.histogram.length - 1] <= 0)) {
             
             try {
                 var o = await alpaca.createOrder({
@@ -387,6 +419,7 @@ async function secondBar(subject, data) {
                 });
                 open_orders[symbol] = o;
                 latest_cost_basis[symbol] = data.c;
+                sendOpenOrders();
             } catch (e) {
                 console.log(e);
             }
@@ -411,6 +444,8 @@ async function secondBar(subject, data) {
             time_in_force: "day",
             limit_price: data.c
         });
+        open_orders[symbol] = o;
+        sendOpenOrders();
         //TODO: find definition of symbols!
         symbols.remove(symbol);
         if (symbols.length <= 0) {
@@ -564,7 +599,7 @@ function subscribeToPositions(){
                         macdUpdated(histl,existing_positions[i].symbol);
                     }
                     hist = histl
-                        .MACD[histl.MACD.length - 1]
+                        .histogram[histl.histogram.length - 1]
                         .toFixed(5);
 
                 } else {
@@ -588,6 +623,7 @@ function subscribeToPositions(){
               if(typeof positionsChanged == "function"){
                   positionsChanged(existing_positions);
               }
+              sendOpenOrders();
         } catch (err) {console.log(err);}
     },
 10000);
@@ -596,4 +632,5 @@ module.exports.StartTrader = startTrader;
 module.exports.PositionsChanged = (func)=>{positionsChanged = func;};
 module.exports.getPositions = ()=>{existing_positions};
 module.exports.MACDUpdate = (func)=>{macdUpdated = func;};
+module.exports.OrderUpdate = (func)=>{orderUpdate = func;};
 module.exports.SubscribeToPositions = subscribeToPositions;

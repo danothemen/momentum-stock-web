@@ -26,6 +26,11 @@ trader.MACDUpdate(function(macd,symbol){
       client.send(JSON.stringify({type:"macd",data:macd,symbol:symbol}));
   });
 });
+trader.OrderUpdate(function(orders){
+  expressWs.getWss().clients.forEach(client=>{
+    client.send(JSON.stringify({type:"order",data:orders}));
+  });
+});
 trader.SubscribeToPositions();
 
 app.listen(port, () => console.log(`Example app listening on port ${port}!`));

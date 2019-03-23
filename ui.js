@@ -2,32 +2,81 @@ import React from "react";
 import ReactDOM from "react-dom";
 import Positions from "./components/positioncomponent";
 import MACDDisplay from "./components/macddisplay";
+import Orders from "./components/openorders";
 import * as SocketClient from "./websocketclient";
 
 class Dashboard extends React.Component {
   posUpdate(pos, myself){
-    myself.setState({positions:pos});
-  }
-  macdUpdate(macd,symbol,myself){
-    for(var i = 0; i < this.state.positions.length; i++){
-      if(this.state.positions.symbol == symbol){
-        this.state.positions.macddata = macd;
-        myself.setState(this.state);
+    if(myself.state && myself.state.positions){
+    for(var i = 0;i < pos.length; i++){
+      for(var y =0; y < myself.state.positions.length; y++){
+        if(myself.state.positions[y].symbol == pos[i].symbol){
+          if(myself.state.positions[y].macddata){
+            pos[i].macddata = myself.state.positions[y].macddata;
+          }
+        }
       }
     }
+  }
+    pos.sort(function(a,b){
+      var textA = a.symbol.toUpperCase();
+      var textB = b.symbol.toUpperCase();
+      return (textA < textB) ? -1 : (textA > textB) ? 1 : 0;
+    });
+    if(myself.state){
+      myself.state.positions = pos;
+      myself.setState(myself.state);
+    }
+    else{
+      myself.setState({positions:pos});
+    }
+  }
+  orderUpdate(orders,myself){
+    myself.state.orders = orders;
+    myself.setState(myself.state);
+  }
+  macdUpdate(macd,symbol,myself){
+    console.log("Macd Update");
+    if(macd==undefined) console.log(macd);
+    if(myself.state){
+    for(var i = 0; i < myself.state.positions.length; i++){
+      //console.log(typeof macd);
+      if(myself.state.positions[i].symbol == symbol && macd){
+        myself.state.positions[i].macddata = macd;
+      }
+    }
+    myself.state.positions.sort(function(a,b){
+      var textA = a.symbol.toUpperCase();
+      var textB = b.symbol.toUpperCase();
+      return (textA < textB) ? -1 : (textA > textB) ? 1 : 0;
+    });
+    myself.setState(myself.state);
+  }
   }
   componentDidMount(){
     SocketClient.setComponentRef(this);
     SocketClient.onPositionUpdate(this.posUpdate);
     SocketClient.onMacd(this.macdUpdate);
+    SocketClient.onOrders(this.orderUpdate);
     SocketClient.connect();
   }
   render() {
+    if(!this.state){
+      return (<div></div>);
+    }
     return (
+      
     <div>
       <Positions data={this.state ? this.state.positions : ""} />
-      {this.state.positions.map(pos =>{
-        return <MACDDisplay symbol={pos.symbol} macddata={pos.macddata}/>
+      <Orders data={this.state ? this.state.orders : ""} />
+       {this.state.positions.map(pos =>{
+         //console.log(pos.macddata);
+         if(pos.macddata){
+          return <MACDDisplay symbol={pos.symbol} macddata={pos.macddata}/>
+         }
+         else{
+           return <div>{JSON.stringify(Object.keys(pos))}</div>
+         }
       })}
     </div>);
   }

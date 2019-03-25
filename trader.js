@@ -195,6 +195,7 @@ function sendOpenOrders() {
 function tradeUpdate(data) {
   var symbol = data.order["symbol"];
   var last_order = open_orders[symbol];
+  console.log(data);
   if (last_order) {
     var event = data.event;
     if (event == "partial_fill") {
@@ -216,6 +217,7 @@ function tradeUpdate(data) {
         (positions[symbol] || 0) - (partial_fills[symbol] || 0);
       partial_fills[symbol] = 0;
       positions[symbol] += qty;
+      console.log("Filled Order");
       delete open_orders[symbol];
     } else if (event == "canceled" || event == "rejected") {
       partial_fills[symbol] = 0;
@@ -285,7 +287,6 @@ function getHighBetween(lbound, ubound, symbol) {
 }
 
 async function secondBar(subject, data) {
-  secondUpdatesReceived++;
   // example second bar
   var symbol = data.sym;
   var ts = new Date(data.s);
@@ -631,7 +632,7 @@ function subscribeToPositions() {
   setInterval(async () => {
     try {
       existing_positions = await alpaca.getPositions();
-      console.log(minute_history);
+      //console.log(minute_history);
 
       if (
         Object.keys(minute_history).length == 0 &&

@@ -9,7 +9,7 @@ app.ws('/', function(ws, req) {
     ws.on('message', function(msg) {
       console.log(msg);
       var toSend = trader.getPositions();
-      ws.send(JSON.stringify({type:"positions",data:toSend}));
+      //ws.send(JSON.stringify({type:"positions",data:toSend}));
     });
     console.log('socket');
   });
@@ -32,5 +32,5 @@ trader.OrderUpdate(function(orders){
   });
 });
 trader.SubscribeToPositions();
-
+trader.StartTrader();
 app.listen(port, () => console.log(`Example app listening on port ${port}!`));

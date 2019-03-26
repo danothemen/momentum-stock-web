@@ -31,6 +31,11 @@ trader.OrderUpdate(function(orders){
     client.send(JSON.stringify({type:"order",data:orders}));
   });
 });
+trader.AccountUpdate(function(account){
+  expressWs.getWss().clients.forEach(client=>{
+    client.send(JSON.stringify({type:"account",data:account}));
+  });
+});
 trader.SubscribeToPositions();
 trader.StartTrader();
 app.listen(port, () => console.log(`Example app listening on port ${port}!`));

@@ -3,6 +3,7 @@ var onPrice;
 var onMacd;
 var onOrder;
 var component;
+var onAccount;
 function connect() {
     client = new WebSocket("ws://localhost:4321");
     client.onmessage = function (event) {
@@ -24,6 +25,11 @@ function connect() {
                     onOrder(msg.data,component);
                 }
                 break;
+            case "account":
+                if(typeof onAccount == "function"){
+                    onAccount(msg.data,component);
+                }
+                break;
         }
     }
 }
@@ -39,8 +45,12 @@ function onMacd(del){
 function onOrders(del){
     onOrder = del;
 }
+function onAccountu(del){
+    onAccount = del;
+}
 module.exports.connect = connect;
 module.exports.onPositionUpdate = onPositionUpdate;
 module.exports.setComponentRef = setComponentRef;
 module.exports.onMacd = onMacd;
 module.exports.onOrders = onOrders;
+module.exports.onAccount = onAccountu;

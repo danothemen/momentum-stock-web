@@ -1,0 +1,13 @@
+.accountinfo{
+    display:flex;
+    padding:0.2em;
+}
+body{
+    margin:0;
+    padding:0;
+    color:white;
+    background-color:#282828;
+}
+.accountproperty{
+    margin-left:5em;
+}

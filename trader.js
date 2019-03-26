@@ -18,6 +18,7 @@ var targetPricesChanged;
 var priceUpdate;
 var orderUpdate;
 var macdUpdated;
+var accountUpdate;
 
 async function getAllTickers() {
   let snapshotUrl = `https://api.polygon.io/v2/snapshot/locale/us/markets/stocks/tickers?apiKey=${key}`;
@@ -632,6 +633,10 @@ function subscribeToPositions() {
   setInterval(async () => {
     try {
       existing_positions = await alpaca.getPositions();
+      var accountInfo = await alpaca.getAccount();
+      if(typeof accountUpdate == "function"){
+        accountUpdate(accountInfo);
+      }
       //console.log(minute_history);
 
       if (
@@ -700,5 +705,8 @@ module.exports.MACDUpdate = func => {
 };
 module.exports.OrderUpdate = func => {
   orderUpdate = func;
+};
+module.exports.AccountUpdate = func => {
+  accountUpdate = func;
 };
 module.exports.SubscribeToPositions = subscribeToPositions;

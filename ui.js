@@ -3,9 +3,14 @@ import ReactDOM from "react-dom";
 import Positions from "./components/positioncomponent";
 import MACDDisplay from "./components/macddisplay";
 import Orders from "./components/openorders";
+import AccountInfo from "./components/accountinfo";
 import * as SocketClient from "./websocketclient";
 
 class Dashboard extends React.Component {
+  accountUpdate(account,myself){
+    myself.state.account = account;
+    myself.setState(myself.state);
+  }
   posUpdate(pos, myself){
     if(myself.state && myself.state.positions){
     for(var i = 0;i < pos.length; i++){
@@ -58,6 +63,7 @@ class Dashboard extends React.Component {
     SocketClient.onPositionUpdate(this.posUpdate);
     SocketClient.onMacd(this.macdUpdate);
     SocketClient.onOrders(this.orderUpdate);
+    SocketClient.onAccount(this.accountUpdate);
     SocketClient.connect();
   }
   render() {
@@ -67,6 +73,7 @@ class Dashboard extends React.Component {
     return (
       
     <div>
+      <AccountInfo data={this.state ? this.state.account : ""}/>
       <Positions data={this.state ? this.state.positions : ""} />
       <Orders data={this.state ? this.state.orders : ""} />
        {this.state.positions.map(pos =>{

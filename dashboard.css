@@ -5,9 +5,12 @@
 body{
     margin:0;
     padding:0;
-    color:white;
+    color:#cccccc;
     background-color:#282828;
 }
 .accountproperty{
     margin-left:5em;
+}
+.tables{
+    display:flex;
 }

@@ -74,8 +74,10 @@ class Dashboard extends React.Component {
       
     <div>
       <AccountInfo data={this.state ? this.state.account : ""}/>
-      <Positions data={this.state ? this.state.positions : ""} />
-      <Orders data={this.state ? this.state.orders : ""} />
+      <div className="tables">
+        <Positions data={this.state ? this.state.positions : ""} />
+        <Orders data={this.state ? this.state.orders : ""} />
+      </div>
        {this.state.positions.map(pos =>{
          //console.log(pos.macddata);
          if(pos.macddata){

@@ -78,6 +78,7 @@ class Dashboard extends React.Component {
         <Positions data={this.state ? this.state.positions : ""} />
         <Orders data={this.state ? this.state.orders : ""} />
       </div>
+      <div className="charts">
        {this.state.positions.map(pos =>{
          //console.log(pos.macddata);
          if(pos.macddata){
@@ -87,6 +88,7 @@ class Dashboard extends React.Component {
            return <div>{JSON.stringify(Object.keys(pos))}</div>
          }
       })}
+      </div>
     </div>);
   }
 }

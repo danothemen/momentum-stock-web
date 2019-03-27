@@ -18,7 +18,7 @@ class MACDDisplay extends React.Component {
         });
     }
     return (
-        <div>
+        <div className="chartcontainer">
           <p>{symbol}</p>
         <LineChart
           isAnimationActive="false"

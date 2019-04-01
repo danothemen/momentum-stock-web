@@ -9,7 +9,7 @@ class Positions extends React.Component {
       return <div></div>
     }
     else{
-      return (<table>
+      return (<table className="positionsTable">
         <thead>
           <tr>
             <th>Symbol</th>
@@ -26,7 +26,7 @@ class Positions extends React.Component {
         <tbody>
           {this.props.data.map(pos=>{
             return (
-            <tr>
+            <tr className={pos.market_value > pos.cost_basis ? "profit" : "loss"}>
               <td>{pos.symbol}</td>
               <td>{pos.exchange}</td>
               <td>{pos.qty}</td>
@@ -35,7 +35,7 @@ class Positions extends React.Component {
               <td>{pos.avg_entry_price}</td>
               <td>{pos.current_price}</td>
               <td>{pos.stop_price}</td>
-              <td>{pos.macd}</td>
+              <td className={pos.macd > 0 ? "momentumup":"momentumdown"}>{pos.macd}</td>
             </tr>
             )
           })}

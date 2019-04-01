@@ -1,6 +1,8 @@
 .accountinfo{
     display:flex;
     padding:0.2em;
+    align-content: center;
+    justify-content: center;
 }
 body{
     margin:0;
@@ -13,6 +15,8 @@ body{
 }
 .tables{
     display:flex;
+    align-content: center;
+    justify-content: center;
 }
 .chartcontainer{
     border-style:solid;
@@ -27,4 +31,27 @@ body{
     flex-wrap: wrap;
     align-content: center;
     justify-content: center;
+}
+.positionsTable{
+    margin-right:auto;
+    margin-left:auto;
+}
+.ordersTable{
+    margin-right:auto;
+    margin-left:auto;
+}
+.profit{
+    color:green;
+}
+.loss{
+    color:red;
+}
+.momentumup{
+    color:green;
+}
+.momentumdown{
+    color:yellow;
+}
+.symbolLabel{
+    margin-left:0.5em;
 }

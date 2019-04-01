@@ -10,7 +10,7 @@ class Orders extends React.Component {
       return <div></div>
     }
     else{
-      return (<table>
+      return (<table className="ordersTable">
         <thead>
           <tr>
             <th>Symbol</th>

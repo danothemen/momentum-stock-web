@@ -2,8 +2,8 @@
     Trade Logic Below
 */
 const Alpaca = require("@alpacahq/alpaca-trade-api");
-const key = "PKEEM7SJ5LQ1429CGPAK";
-const secret = "7prDOquO7qIwnu/40CKIfDSRoYniMjQTYgSb9eZC";
+const key = "PKRGCXM3C3FLXR21RIOY";
+const secret = "P4XCTPDBnqDqUSwzG6IQyRjCrxcgt9pYUFVYoNUG";
 const alpaca = new Alpaca({ keyId: key, secretKey: secret, paper: true });
 const macd = require("macd");
 const fs = require("fs");

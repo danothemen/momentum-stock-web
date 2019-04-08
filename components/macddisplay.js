@@ -19,8 +19,13 @@ class MACDDisplay extends React.Component {
         });
     }
     return (
-        <div className="chartcontainer">
-          <p className="symbolLabel">{symbol}</p>
+        <div className={"chartcontainer "+(this.props.pos.macd > 0 ? "" : "warnborder")}>
+          <div className="symbolInfoContainer">
+            <p className="symbolLabel">{symbol}</p>
+            <p className="symbolLabel">Cost Basis: {this.props.pos.avg_entry_price}</p>
+            <p className="symbolLabel">Price: {this.props.pos.current_price}</p>
+            <p className="symbolLabel">Stop: {this.props.pos.stop_price}</p>
+          </div>
         <LineChart
           isAnimationActive="false"
           width={500}

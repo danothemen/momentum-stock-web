@@ -55,3 +55,9 @@ body{
 .symbolLabel{
     margin-left:0.5em;
 }
+.symbolInfoContainer{
+    display:flex;
+}
+.warnborder{
+    border-color: yellow;
+}

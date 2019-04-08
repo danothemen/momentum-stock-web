@@ -82,7 +82,7 @@ class Dashboard extends React.Component {
        {this.state.positions.map(pos =>{
          //console.log(pos.macddata);
          if(pos.macddata){
-          return <MACDDisplay symbol={pos.symbol} macddata={pos.macddata}/>
+          return <MACDDisplay symbol={pos.symbol} pos={pos} macddata={pos.macddata}/>
          }
          else{
            return <div>{JSON.stringify(Object.keys(pos))}</div>

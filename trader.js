@@ -163,33 +163,6 @@ async function getTickers() {
 function sendOpenOrders() {
   if (typeof orderUpdate == "function") {
     orderUpdate(open_orders);
-    var testOrder = {
-      LPCN: {
-        id: "126413ba-1c12-4c0d-b035-07749a42249a",
-        client_order_id: "40364bec-6955-4775-8aba-8f02d2884847",
-        created_at: "2019-03-13T16:48:47.251895556Z",
-        updated_at: "2019-03-13T16:48:47.257155238Z",
-        submitted_at: "2019-03-13T16:48:47.225307042Z",
-        filled_at: null,
-        expired_at: null,
-        canceled_at: null,
-        failed_at: null,
-        asset_id: "ec8545ca-7f56-414a-977f-877d8d7193e0",
-        symbol: "LPCN",
-        asset_class: "us_equity",
-        qty: "2225",
-        filled_qty: "0",
-        filled_avg_price: null,
-        order_type: "limit",
-        type: "limit",
-        side: "sell",
-        time_in_force: "day",
-        limit_price: "2.02",
-        stop_price: null,
-        status: "new"
-      }
-    };
-    //orderUpdate(testOrder);
   }
 }
 
@@ -209,7 +182,7 @@ function tradeUpdate(data) {
       partial_fills[symbol] = qty;
       positions[symbol] += qty;
       open_orders[symbol] = data.order;
-    } else if (event == "filled") {
+    } else if (event == "fill") {
       qty = data.order["filled_qty"];
       if (data.order["side"] == "sell") {
         qty = qty * -1;
@@ -224,6 +197,13 @@ function tradeUpdate(data) {
       partial_fills[symbol] = 0;
       delete open_orders[symbol];
     }
+    else{
+      console.log("Unrecognized trade event");
+      console.log(event);
+    }
+  }
+  else{
+    console.log("No Last Order");
   }
   sendOpenOrders();
 }
@@ -236,43 +216,6 @@ function getIndexForTimeStamp(symbol, ts) {
     }
   }
   return -1;
-}
-function displayOpenOrders() {
-  /*{"LPCN":
-{"id":"126413ba-1c12-4c0d-b035-07749a42249a",
-"client_order_id":"40364bec-6955-4775-8aba-8f02d2884847",
-"created_at":"2019-03-13T16:48:47.251895556Z",
-"updated_at":"2019-03-13T16:48:47.257155238Z",
-"submitted_at":"2019-03-13T16:48:47.225307042Z",
-"filled_at":null,
-"expired_at":null,
-"canceled_at":null,
-"failed_at":null,
-"asset_id":"ec8545ca-7f56-414a-977f-877d8d7193e0",
-"symbol":"LPCN",
-"asset_class":"us_equity",
-"qty":"2225",
-"filled_qty":"0",
-"filled_avg_price":null,
-"order_type":"limit",
-"type":"limit",
-"side":"sell",
-"time_in_force":"day",
-"limit_price":"2.02",
-"stop_price":null,
-"status":"new"}}*/
-  var headers = ["Symb", "Qty", "Limit", "Created"];
-  var toDisplay = [];
-  var openKeys = Object.keys(open_orders);
-  for (var i = 0; i < openKeys.length; i++) {
-    var toPush = [
-      open_orders[openKeys[i]].symbol,
-      open_orders[openKeys[i]].qty,
-      open_orders[openKeys[i]].limit_price,
-      open_orders[openKeys[i]].created_at
-    ];
-    toDisplay.push(toPush);
-  }
 }
 function getHighBetween(lbound, ubound, symbol) {
   var toSearch = minute_history[symbol].ticks.filter(t => {
@@ -288,6 +231,7 @@ function getHighBetween(lbound, ubound, symbol) {
 }
 
 async function secondBar(subject, data) {
+  //console.log(subject);
   // example second bar
   var symbol = data.sym;
   var ts = new Date(data.s);
@@ -346,11 +290,12 @@ async function secondBar(subject, data) {
     since_market_open / 1000 / 60 <
       after_open_trade_min /*remove || true after debugging || true*/
   ) {
+    let shouldbuy = true;
     // Check for buy signals
     // See if we've already bought in first
     var position = positions[symbol];
     if (position > 0) {
-      return;
+      shouldbuy = false;
     }
 
     // See how high the price went during the first 15 minutes
@@ -362,7 +307,7 @@ async function secondBar(subject, data) {
     } else {
       // Because we're aggregating on the fly, sometimes the datetime index can get
       // messy until it's healed by the minute bars
-      return;
+      shouldbuy = false;
     }
 
     // Get the change since yesterday's market close
@@ -383,7 +328,7 @@ async function secondBar(subject, data) {
           hist.histogram[hist.histogram.length - 1]
         )
       ) {
-        return;
+        shouldbuy = false;
       }
       hist = macd(closingPrices, 60, 40, 9); //TODO: Ask about on slack
 
@@ -393,7 +338,7 @@ async function secondBar(subject, data) {
           hist.histogram[hist.histogram.length - 2] <
           0
       ) {
-        return;
+        shouldbuy = false;
       }
       // Stock has passed all checks; figure out how much to buy
       var stop_price = find_stop(data.c, minute_history[symbol], ts);
@@ -409,21 +354,23 @@ async function secondBar(subject, data) {
         shares_to_buy -= positions[symbol];
       }
       if (shares_to_buy <= 0) {
-        return;
+        shouldbuy = false;
       }
 
       try {
-        var o = await alpaca.createOrder({
-          symbol: symbol,
-          qty: shares_to_buy,
-          side: "buy",
-          type: "limit",
-          time_in_force: "day",
-          limit_price: data.c
-        });
-        open_orders[symbol] = o;
-        latest_cost_basis[symbol] = data.c;
-        sendOpenOrders();
+        if (shouldbuy) {
+          var o = await alpaca.createOrder({
+            symbol: symbol,
+            qty: shares_to_buy,
+            side: "buy",
+            type: "limit",
+            time_in_force: "day",
+            limit_price: data.c
+          });
+          open_orders[symbol] = o;
+          latest_cost_basis[symbol] = data.c;
+          sendOpenOrders();
+        }
       } catch (e) {
         console.log(e);
       }
@@ -431,7 +378,7 @@ async function secondBar(subject, data) {
   }
   //Begin Sell Logic
   if (
-    since_market_open / 1000 / 60 >= 24 ||
+    since_market_open / 1000 / 60 >= 24 &&
     until_market_close / 1000 / 60 > 15
   ) {
     // Check for liquidation signals log.log("Checking for sell signals"); We can't
@@ -495,13 +442,14 @@ async function secondBar(subject, data) {
     open_orders[symbol] = o;
     sendOpenOrders();
     //TODO: find definition of symbols!
+    console.log("Ready to Sell");
     symbols.remove(symbol);
     if (symbols.length <= 0) {
       conn.close();
     }
     websocket.unsubscribe([`A.${symbol}`, `AM.${symbol}`]);
   }
-
+  console.log(until_market_close / 1000 / 60);
   // loc function in python is just finding the minute timestamp look at
   // https://www.npmjs.com/package/macd for MACD calculations
   /*{ sym: 'SOLO',
@@ -571,7 +519,7 @@ async function run(tickers) {
   websocket.onStockAggMin(minuteBar);
   websocket.onOrderUpdate(tradeUpdate);
   var toSubscribe = ["trade_updates"];
-
+  console.log(`${tickers.length} Tickers Watching`);
   for (var i = 0; i < tickers.length; i++) {
     var toAddA = "A." + tickers[i].ticker;
     var toAddAM = "AM." + tickers[i].ticker;
@@ -584,6 +532,8 @@ async function run(tickers) {
   websocket.onStateChange(newState => {});
   websocket.onConnect(() => {
     websocket.subscribe(toSubscribe);
+    console.log(toSubscribe);
+    console.log("Api Socket Connected");
   });
   websocket.onDisconnect(() => {});
   websocket.onError(() => {});
@@ -609,6 +559,7 @@ async function run(tickers) {
     }
   }
   websocket.connect();
+  console.log(websocket.subscriptionState);
 }
 async function startTrader() {
   var calendarArr = await alpaca.getCalendar({
@@ -634,7 +585,7 @@ function subscribeToPositions() {
     try {
       existing_positions = await alpaca.getPositions();
       var accountInfo = await alpaca.getAccount();
-      if(typeof accountUpdate == "function"){
+      if (typeof accountUpdate == "function") {
         accountUpdate(accountInfo);
       }
       //console.log(minute_history);
@@ -698,7 +649,7 @@ module.exports.PositionsChanged = func => {
   positionsChanged = func;
 };
 module.exports.getPositions = () => {
-  existing_positions;
+  return existing_positions;
 };
 module.exports.MACDUpdate = func => {
   macdUpdated = func;

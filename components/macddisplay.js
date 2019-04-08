@@ -14,7 +14,8 @@ class MACDDisplay extends React.Component {
         chartdata.push({
             macd:this.props.macddata.MACD[i],
             histogram:this.props.macddata.histogram[i],
-            signal:this.props.macddata.signal[i]
+            signal:this.props.macddata.signal[i],
+            zero:0
         });
     }
     return (
@@ -36,6 +37,7 @@ class MACDDisplay extends React.Component {
           <Line type="linear" isAnimationActive={false} dot={false} dataKey="signal" stroke="#8884d8" activeDot={{ r: 8 }} />
           <Line type="linear" isAnimationActive={false} dot={false} dataKey="histogram" stroke="#82ca9d" />
           <Line type="linear" isAnimationActive={false} dot={false} dataKey="macd" stroke="#FF0000" />
+          <Line type="linear" isAnimationActive={false} dot={false} dataKey="zero" stroke="#000000" />
         </LineChart>
         </div>
       );

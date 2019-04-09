@@ -76,6 +76,7 @@ var open_orders = {};
 
 var stop_prices = {};
 var latest_cost_basis = {};
+let websocket = alpaca.websocket;
 
 function find_stop(current_value, minute_historyinf, now) {
   //TODO: Need more sophisticated stop loss algorithm
@@ -513,8 +514,6 @@ function minuteBar(subject, data) {
    */
 }
 async function run(tickers) {
-  let websocket = alpaca.websocket;
-
   websocket.onStockAggSec(secondBar);
   websocket.onStockAggMin(minuteBar);
   websocket.onOrderUpdate(tradeUpdate);
